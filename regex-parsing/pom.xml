@@ -53,5 +53,10 @@
       <version>2.3</version>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>dk.brics</groupId>
+      <artifactId>automaton</artifactId>
+      <version>1.12-4</version>
+    </dependency>
   </dependencies>
 </project>

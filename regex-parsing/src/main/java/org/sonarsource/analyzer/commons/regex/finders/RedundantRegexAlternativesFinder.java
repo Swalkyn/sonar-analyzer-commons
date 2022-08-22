@@ -92,9 +92,7 @@ public class RedundantRegexAlternativesFinder extends RegexBaseVisitor {
     }
 
     private static boolean supersetOf(RegexTree alternative1, RegexTree alternative2) {
-      SubAutomaton subAutomaton1 = new SubAutomaton(alternative1, alternative1.continuation(), false);
-      SubAutomaton subAutomaton2 = new SubAutomaton(alternative2, alternative2.continuation(), false);
-      return RegexTreeHelper.supersetOf(subAutomaton1, subAutomaton2, false);
+      return RegexTreeHelper.supersetOf(alternative1.getText(), alternative2.getText(), false, false, false);
     }
 
     private void add(RegexTree superset, RegexTree subset) {

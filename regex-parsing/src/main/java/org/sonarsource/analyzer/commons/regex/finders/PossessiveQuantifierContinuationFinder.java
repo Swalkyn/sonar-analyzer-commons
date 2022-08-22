@@ -22,14 +22,17 @@ package org.sonarsource.analyzer.commons.regex.finders;
 import java.util.Collections;
 import org.sonarsource.analyzer.commons.regex.RegexIssueLocation;
 import org.sonarsource.analyzer.commons.regex.RegexIssueReporter;
+import org.sonarsource.analyzer.commons.regex.RegexParseResult;
 import org.sonarsource.analyzer.commons.regex.ast.AutomatonState;
 import org.sonarsource.analyzer.commons.regex.ast.FinalState;
+import org.sonarsource.analyzer.commons.regex.ast.IndexRange;
 import org.sonarsource.analyzer.commons.regex.ast.Quantifier;
 import org.sonarsource.analyzer.commons.regex.ast.RegexBaseVisitor;
 import org.sonarsource.analyzer.commons.regex.ast.RegexSyntaxElement;
+import org.sonarsource.analyzer.commons.regex.ast.RegexTree;
 import org.sonarsource.analyzer.commons.regex.ast.RepetitionTree;
+import org.sonarsource.analyzer.commons.regex.helpers.ReconstructionVisitor;
 import org.sonarsource.analyzer.commons.regex.helpers.RegexTreeHelper;
-import org.sonarsource.analyzer.commons.regex.helpers.SubAutomaton;
 
 public class PossessiveQuantifierContinuationFinder extends RegexBaseVisitor {
 
@@ -38,9 +41,17 @@ public class PossessiveQuantifierContinuationFinder extends RegexBaseVisitor {
   private final RegexIssueReporter.ElementIssue regexElementIssueReporter;
   private final FinalState finalState;
 
+  private RegexTree root;
+
   public PossessiveQuantifierContinuationFinder(RegexIssueReporter.ElementIssue regexElementIssueReporter, FinalState finalState) {
     this.regexElementIssueReporter = regexElementIssueReporter;
     this.finalState = finalState;
+  }
+
+  @Override
+  public void visit(RegexParseResult parseResult) {
+    root = parseResult.getResult();
+    super.visit(parseResult);
   }
 
   @Override
@@ -58,11 +69,12 @@ public class PossessiveQuantifierContinuationFinder extends RegexBaseVisitor {
 
   private boolean doesRepetitionContinuationAlwaysFail(RepetitionTree repetitionTree) {
     Quantifier quantifier = repetitionTree.getQuantifier();
+    RegexTree element = repetitionTree.getElement();
     if (!quantifier.isOpenEnded() || quantifier.getModifier() != Quantifier.Modifier.POSSESSIVE) {
       return false;
     }
-    SubAutomaton potentialSuperset = new SubAutomaton(repetitionTree.getElement(), repetitionTree.continuation(), false);
-    SubAutomaton potentialSubset = new SubAutomaton(repetitionTree.continuation(), finalState, true);
-    return RegexTreeHelper.supersetOf(potentialSuperset, potentialSubset, false);
+    ReconstructionVisitor reconstructionVisitor = new ReconstructionVisitor(repetitionTree.getRange());
+    reconstructionVisitor.visit(root);
+    return !RegexTreeHelper.intersects(element.getText(), reconstructionVisitor.result(), false, false, false, true);
   }
 }

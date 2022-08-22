@@ -47,6 +47,22 @@ public class IndexRange {
     return new IndexRange(beginningOffset, newEnd);
   }
 
+  public boolean lowerThan(IndexRange other) {
+    return this.endingOffset <= other.beginningOffset;
+  }
+
+  public boolean higherThan(IndexRange other) {
+    return other.lowerThan(this);
+  }
+
+  public boolean contains(IndexRange other) {
+    return this.beginningOffset <= other.beginningOffset && other.endingOffset <= this.endingOffset;
+  }
+
+  public int length() {
+    return endingOffset - beginningOffset;
+  }
+
   @Override
   public boolean equals(Object other) {
     return other instanceof IndexRange

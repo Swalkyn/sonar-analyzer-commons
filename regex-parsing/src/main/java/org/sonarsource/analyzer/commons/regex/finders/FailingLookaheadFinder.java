@@ -22,12 +22,13 @@ package org.sonarsource.analyzer.commons.regex.finders;
 import java.util.Collections;
 import org.sonarsource.analyzer.commons.regex.MatchType;
 import org.sonarsource.analyzer.commons.regex.RegexIssueReporter;
+import org.sonarsource.analyzer.commons.regex.RegexParseResult;
 import org.sonarsource.analyzer.commons.regex.ast.FinalState;
 import org.sonarsource.analyzer.commons.regex.ast.LookAroundTree;
 import org.sonarsource.analyzer.commons.regex.ast.RegexBaseVisitor;
 import org.sonarsource.analyzer.commons.regex.ast.RegexTree;
+import org.sonarsource.analyzer.commons.regex.helpers.ReconstructionVisitor;
 import org.sonarsource.analyzer.commons.regex.helpers.RegexTreeHelper;
-import org.sonarsource.analyzer.commons.regex.helpers.SubAutomaton;
 
 public class FailingLookaheadFinder extends RegexBaseVisitor {
 
@@ -36,6 +37,8 @@ public class FailingLookaheadFinder extends RegexBaseVisitor {
   private final RegexIssueReporter.ElementIssue regexElementIssueReporter;
   private final FinalState finalState;
   private final MatchType matchType;
+
+  private RegexTree root = null;
 
   public FailingLookaheadFinder(RegexIssueReporter.ElementIssue regexElementIssueReporter, FinalState finalState) {
     this(regexElementIssueReporter, finalState, MatchType.NOT_SUPPORTED);
@@ -48,6 +51,12 @@ public class FailingLookaheadFinder extends RegexBaseVisitor {
   }
 
   @Override
+  public void visit(RegexParseResult parseResult) {
+    root = parseResult.getResult();
+    super.visit(parseResult);
+  }
+
+  @Override
   public void visitLookAround(LookAroundTree tree) {
     if (tree.getDirection() == LookAroundTree.Direction.AHEAD && doesLookaheadContinuationAlwaysFail(tree)) {
       regexElementIssueReporter.report(tree, MESSAGE, null, Collections.emptyList());
@@ -56,16 +65,14 @@ public class FailingLookaheadFinder extends RegexBaseVisitor {
   }
 
   private boolean doesLookaheadContinuationAlwaysFail(LookAroundTree lookAround) {
-    RegexTree lookAroundElement = lookAround.getElement();
-    SubAutomaton lookAroundSubAutomaton;
-    SubAutomaton continuationSubAutomaton = new SubAutomaton(lookAround.continuation(), finalState, true);
+    ReconstructionVisitor reconstructionVisitor = new ReconstructionVisitor(lookAround.getRange());
+    reconstructionVisitor.visit(root);
+    String regexA = lookAround.getElement().getText();
+    String regexB = reconstructionVisitor.result();
 
     if (lookAround.getPolarity() == LookAroundTree.Polarity.NEGATIVE) {
-      lookAroundSubAutomaton = new SubAutomaton(lookAroundElement, lookAroundElement.continuation(), false);
-      return RegexTreeHelper.supersetOf(lookAroundSubAutomaton, continuationSubAutomaton, false);
+      return !RegexTreeHelper.intersects(regexA, regexB, true, false, false, true);
     }
-    boolean canLookAroundBeAPrefix = matchType != MatchType.FULL;
-    lookAroundSubAutomaton = new SubAutomaton(lookAroundElement, lookAroundElement.continuation(), canLookAroundBeAPrefix);
-    return !RegexTreeHelper.intersects(lookAroundSubAutomaton, continuationSubAutomaton, true);
+    return !RegexTreeHelper.intersects(regexA, regexB, true, matchType != MatchType.FULL, true, false);
   }
 }

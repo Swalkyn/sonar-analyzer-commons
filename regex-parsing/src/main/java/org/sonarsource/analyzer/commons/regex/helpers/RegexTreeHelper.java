@@ -22,6 +22,8 @@ package org.sonarsource.analyzer.commons.regex.helpers;
 
 import java.util.HashSet;
 import java.util.Set;
+import dk.brics.automaton.Automaton;
+import dk.brics.automaton.RegExp;
 import org.sonarsource.analyzer.commons.regex.ast.AutomatonState;
 import org.sonarsource.analyzer.commons.regex.ast.BoundaryTree;
 import org.sonarsource.analyzer.commons.regex.ast.FinalState;
@@ -36,6 +38,16 @@ public class RegexTreeHelper {
   }
 
   /**
+   * Translates java.util.re syntax into brics syntax
+   */
+  private static Automaton regexToAutomaton(String regex) {
+    String processed = regex
+      .replace("\\\\", "\\")
+      .replace("\\d", "[0-9]");
+    return new RegExp(processed).toAutomaton();
+  }
+
+  /**
    * If both sub-automata have allowPrefix set to true, this method will check whether auto1 intersects
    * the prefix of auto2 or auto2 intersects the prefix of auto1. This is different than checking whether
    * the prefix of auto1 intersects the prefix of auto2 (which would always be true because both prefix
@@ -43,8 +55,31 @@ public class RegexTreeHelper {
    * defaultAnswer will be returned in case of unsupported features or the state limit is exceeded.
    * It should be whichever answer does not lead to an issue being reported to avoid false positives.
    */
-  public static boolean intersects(SubAutomaton auto1, SubAutomaton auto2, boolean defaultAnswer) {
-    return new IntersectAutomataChecker(defaultAnswer).check(auto1, auto2);
+  public static boolean intersects(String regexA, String regexB, boolean defaultAnswer, boolean prefixA, boolean prefixB, boolean negate) {
+    try {
+      Automaton dfaA = regexToAutomaton(regexA);
+      Automaton dfaB = regexToAutomaton(regexB);
+      if (negate) {
+        dfaA = dfaA.concatenate(new RegExp(".*").toAutomaton()).complement();
+      }
+      if (prefixA && prefixB) {
+        Automaton dfaAPrefix = dfaA.clone();
+        dfaAPrefix.prefixClose();
+        Automaton dfaBPrefix = dfaB.clone();
+        dfaBPrefix.prefixClose();
+        return !(dfaA.intersection(dfaBPrefix).isEmpty() && dfaAPrefix.intersection(dfaB).isEmpty());
+      }
+      if (prefixA) {
+        dfaA.prefixClose();
+      }
+      if (prefixB) {
+        dfaB.prefixClose();
+      }
+      Automaton intersection = dfaA.intersection(dfaB);
+      return !(intersection.isEmpty() || intersection.isEmptyString());
+    } catch (IllegalArgumentException e) {
+      return defaultAnswer;
+    }
   }
 
   /**
@@ -52,8 +87,26 @@ public class RegexTreeHelper {
    * auto1.allowPrefix means that if supersetOf(auto1, auto2), then for every string matched by auto2, auto1 can match a continuation of it
    * If both are set, it means either one can be the case.
    */
-  public static boolean supersetOf(SubAutomaton auto1, SubAutomaton auto2, boolean defaultAnswer) {
-    return new SupersetAutomataChecker(defaultAnswer).check(auto1, auto2);
+  public static boolean supersetOf(String regexA, String regexB, boolean defaultAnswer, boolean prefixA, boolean prefixB) {
+    // FIXME: approximation, can return incorrect results.
+    try {
+      Automaton dfaA = regexToAutomaton(regexA);
+      Automaton dfaB = regexToAutomaton(regexB);
+      if (prefixB) {
+        String commonPrefix = dfaB.getCommonPrefix();
+        if (!commonPrefix.isEmpty()) {
+          Automaton commonPrefixes = new RegExp(commonPrefix).toAutomaton();
+          commonPrefixes.prefixClose();
+          return !commonPrefixes.intersection(dfaA).isEmpty();
+        }
+      } else if (prefixA) {
+        dfaA.prefixClose();
+        return dfaB.subsetOf(dfaA);
+      }
+      return dfaB.subsetOf(dfaA);
+    } catch (IllegalArgumentException e) {
+      return defaultAnswer;
+    }
   }
 
   public static boolean isAnchoredAtEnd(AutomatonState start) {

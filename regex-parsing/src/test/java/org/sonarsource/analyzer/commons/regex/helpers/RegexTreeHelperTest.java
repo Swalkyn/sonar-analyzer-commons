@@ -118,8 +118,8 @@ class RegexTreeHelperTest {
     assertIntersects("a+b", "aa", false).isFalse();
     assertIntersects("aa", "a+b", false).isFalse();
     // finite repetition > 1 not supported
-    assertIntersects("a{2}", "aa", false).isFalse();
-    assertIntersects("aa", "a{2}", false).isFalse();
+    assertIntersects("a{2}", "aa", false).isTrue();
+    assertIntersects("aa", "a{2}", false).isTrue();
   }
 
   @Test
@@ -263,9 +263,9 @@ class RegexTreeHelperTest {
     assertSupersetOf("a{1,}b", "aab", false).isTrue();
     assertSupersetOf("aab", "a{1,}b", false).isFalse();
     // finite repetition > 1 not supported
-    assertSupersetOf("aa", "a+", false).isFalse();
-    assertSupersetOf("a{2}", "aa", false).isFalse();
-    assertSupersetOf("aa", "a{2}", false).isFalse();
+    assertSupersetOf("a+", "aa", false).isTrue();
+    assertSupersetOf("a{2}", "aa", false).isTrue();
+    assertSupersetOf("aa", "a{2}", false).isTrue();
   }
 
   @Test
@@ -446,9 +446,10 @@ class RegexTreeHelperTest {
     String set1, boolean set1AllowPrefix,
     String set2, boolean set2AllowPrefix,
     boolean defaultAnswer, int flags) {
-    SubAutomaton sub1 = parseSubAutomaton(set1, set1AllowPrefix, flags);
-    SubAutomaton sub2 = parseSubAutomaton(set2, set2AllowPrefix, flags);
-    return assertThat(RegexTreeHelper.intersects(sub1, sub2, defaultAnswer));
+    FlagSet flagSet = new FlagSet(flags);
+    String regexA = parseRegex(set1, flagSet).getResult().getText();
+    String regexB = parseRegex(set2, flagSet).getResult().getText();
+    return assertThat(RegexTreeHelper.intersects(regexA, regexB, defaultAnswer, set1AllowPrefix, set2AllowPrefix, false));
   }
 
   private static AbstractBooleanAssert<?> assertSupersetOf(String superset, String subset, boolean defaultAnswer) {
@@ -470,9 +471,10 @@ class RegexTreeHelperTest {
     String superset, boolean supersetAllowPrefix,
     String subset, boolean subsetAllowPrefix,
     boolean defaultAnswer, int flags) {
-    SubAutomaton supersetSub = parseSubAutomaton(superset, supersetAllowPrefix, flags);
-    SubAutomaton subsetSub = parseSubAutomaton(subset, subsetAllowPrefix, flags);
-    return assertThat(RegexTreeHelper.supersetOf(supersetSub, subsetSub, defaultAnswer));
+    FlagSet flagSet = new FlagSet(flags);
+    String regexSuperset = parseRegex(superset, flagSet).getResult().getText();
+    String regexSubset = parseRegex(subset, flagSet).getResult().getText();
+    return assertThat(!RegexTreeHelper.intersects(regexSuperset, regexSubset, defaultAnswer, supersetAllowPrefix, subsetAllowPrefix, true));
   }
 
   static SubAutomaton parseSubAutomaton(String stringLiteral, boolean allowPrefix, int flags) {
