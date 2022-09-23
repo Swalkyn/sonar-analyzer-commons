@@ -61,6 +61,8 @@ public abstract class RegexTree extends AbstractRegexSyntaxElement implements Au
    */
   public abstract void accept(RegexVisitor visitor);
 
+  public abstract <T> T accept(ReturningRegexVisitor<T> visitor);
+
   public abstract Kind kind();
 
   public boolean is(Kind... kinds) {

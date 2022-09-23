@@ -33,6 +33,11 @@ public class AtomicGroupTree extends GroupTree {
     visitor.visitAtomicGroup(this);
   }
 
+  @Override
+  public <T> T accept(ReturningRegexVisitor<T> visitor) {
+    return visitor.visitAtomicGroup(this);
+  }
+
   @Nonnull
   @Override
   public RegexTree getElement() {

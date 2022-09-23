@@ -67,6 +67,11 @@ public class BoundaryTree extends RegexTree {
   }
 
   @Override
+  public <T> T accept(ReturningRegexVisitor<T> visitor) {
+    return visitor.visitBoundary(this);
+  }
+
+  @Override
   public RegexTree.Kind kind() {
     return RegexTree.Kind.BOUNDARY;
   }

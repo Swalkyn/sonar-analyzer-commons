@@ -50,6 +50,12 @@ public class PosixCharacterClassElementTree extends AbstractRegexSyntaxElement i
     // do nothing
   }
 
+  @Override
+  public <T> T accept(ReturningRegexVisitor<T> visitor) {
+    return null;
+  }
+
+
   public boolean isNegation() {
     return isNegation;
   }

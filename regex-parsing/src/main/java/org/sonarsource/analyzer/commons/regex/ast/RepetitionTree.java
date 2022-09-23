@@ -59,6 +59,11 @@ public class RepetitionTree extends RegexTree {
   }
 
   @Override
+  public <T> T accept(ReturningRegexVisitor<T> visitor) {
+    return visitor.visitRepetition(this);
+  }
+
+  @Override
   public Kind kind() {
     return Kind.REPETITION;
   }

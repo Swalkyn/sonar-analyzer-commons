@@ -64,6 +64,11 @@ public class LookAroundTree extends GroupTree {
     visitor.visitLookAround(this);
   }
 
+  @Override
+  public <T> T accept(ReturningRegexVisitor<T> visitor) {
+    return visitor.visitLookAround(this);
+  }
+
   @Nonnull
   @Override
   public TransitionType incomingTransitionType() {

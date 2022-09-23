@@ -45,6 +45,11 @@ public class CharacterClassUnionTree extends AbstractRegexSyntaxElement implemen
     visitor.visitCharacterClassUnion(this);
   }
 
+  @Override
+  public <T> T accept(ReturningRegexVisitor<T> visitor) {
+    return visitor.visitCharacterClassUnion(this);
+  }
+
   @Nonnull
   @Override
   public Kind characterClassElementKind() {

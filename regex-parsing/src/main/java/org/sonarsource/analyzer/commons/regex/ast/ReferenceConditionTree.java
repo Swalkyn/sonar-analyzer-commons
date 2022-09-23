@@ -36,6 +36,12 @@ public class ReferenceConditionTree extends GroupTree {
     // do nothing
   }
 
+  @Override
+  public <T> T accept(ReturningRegexVisitor<T> visitor) {
+    return null;
+  }
+
+
   public String getReference() {
     return reference;
   }

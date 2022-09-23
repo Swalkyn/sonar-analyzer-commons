@@ -50,6 +50,11 @@ public class CharacterRangeTree extends AbstractRegexSyntaxElement implements Ch
     visitor.visitCharacterRange(this);
   }
 
+  @Override
+  public <T> T accept(ReturningRegexVisitor<T> visitor) {
+    return visitor.visitCharacterRange(this);
+  }
+
   @Nonnull
   @Override
   public Kind characterClassElementKind() {

@@ -46,6 +46,11 @@ public class SequenceTree extends RegexTree {
   }
 
   @Override
+  public <T> T accept(ReturningRegexVisitor<T> visitor) {
+    return visitor.visitSequence(this);
+  }
+
+  @Override
   public Kind kind() {
     return Kind.SEQUENCE;
   }

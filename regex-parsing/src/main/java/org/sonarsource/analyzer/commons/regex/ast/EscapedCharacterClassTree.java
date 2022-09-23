@@ -72,6 +72,11 @@ public class EscapedCharacterClassTree extends RegexTree implements CharacterCla
   }
 
   @Override
+  public <T> T accept(ReturningRegexVisitor<T> visitor) {
+    return visitor.visitEscapedCharacterClass(this);
+  }
+
+  @Override
   public RegexTree.Kind kind() {
     return RegexTree.Kind.ESCAPED_CHARACTER_CLASS;
   }

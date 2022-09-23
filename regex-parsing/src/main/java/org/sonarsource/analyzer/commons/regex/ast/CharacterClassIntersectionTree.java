@@ -53,6 +53,11 @@ public class CharacterClassIntersectionTree extends AbstractRegexSyntaxElement i
     visitor.visitCharacterClassIntersection(this);
   }
 
+  @Override
+  public <T> T accept(ReturningRegexVisitor<T> visitor) {
+    return visitor.visitCharacterClassIntersection(this);
+  }
+
   @Nonnull
   @Override
   public Kind characterClassElementKind() {

@@ -70,6 +70,11 @@ public class ConditionalSubpatternTree extends GroupTree {
     visitor.visitConditionalSubpattern(this);
   }
 
+  @Override
+  public <T> T accept(ReturningRegexVisitor<T> visitor) {
+    return visitor.visitConditionalSubpattern(this);
+  }
+
   @Nonnull
   @Override
   public TransitionType incomingTransitionType() {

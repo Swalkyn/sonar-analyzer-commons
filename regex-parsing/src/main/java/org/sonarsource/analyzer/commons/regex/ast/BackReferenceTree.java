@@ -62,6 +62,11 @@ public class BackReferenceTree extends RegexTree {
   }
 
   @Override
+  public <T> T accept(ReturningRegexVisitor<T> visitor) {
+    return visitor.visitBackReference(this);
+  }
+
+  @Override
   public RegexTree.Kind kind() {
     return RegexTree.Kind.BACK_REFERENCE;
   }

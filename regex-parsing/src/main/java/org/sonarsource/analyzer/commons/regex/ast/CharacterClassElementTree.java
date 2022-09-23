@@ -41,6 +41,8 @@ public interface CharacterClassElementTree extends RegexSyntaxElement {
 
   void accept(RegexVisitor visitor);
 
+  <T> T accept(ReturningRegexVisitor<T> visitor);
+
   default boolean is(Kind... kinds) {
     Kind thisKind = characterClassElementKind();
     for (Kind kind : kinds) {

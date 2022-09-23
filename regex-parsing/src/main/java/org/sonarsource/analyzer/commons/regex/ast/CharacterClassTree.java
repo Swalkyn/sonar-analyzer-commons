@@ -56,6 +56,11 @@ public class CharacterClassTree extends RegexTree implements CharacterClassEleme
   }
 
   @Override
+  public <T> T accept(ReturningRegexVisitor<T> visitor) {
+    return visitor.visitCharacterClass(this);
+  }
+
+  @Override
   public RegexTree.Kind kind() {
     return RegexTree.Kind.CHARACTER_CLASS;
   }

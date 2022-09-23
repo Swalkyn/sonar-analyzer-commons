@@ -50,6 +50,11 @@ public class DisjunctionTree extends RegexTree {
   }
 
   @Override
+  public <T> T accept(ReturningRegexVisitor<T> visitor) {
+    return visitor.visitDisjunction(this);
+  }
+
+  @Override
   public Kind kind() {
     return Kind.DISJUNCTION;
   }

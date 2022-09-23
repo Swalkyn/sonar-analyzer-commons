@@ -60,4 +60,9 @@ public class NonCapturingGroupTree extends GroupTree {
   public void accept(RegexVisitor visitor) {
     visitor.visitNonCapturingGroup(this);
   }
+
+  @Override
+  public <T> T accept(ReturningRegexVisitor<T> visitor) {
+    return visitor.visitNonCapturingGroup(this);
+  }
 }

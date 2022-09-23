@@ -47,6 +47,11 @@ public class CapturingGroupTree extends GroupTree {
     visitor.visitCapturingGroup(this);
   }
 
+  @Override
+  public <T> T accept(ReturningRegexVisitor<T> visitor) {
+    return visitor.visitCapturingGroup(this);
+  }
+
   public Optional<String> getName() {
     return Optional.ofNullable(name);
   }

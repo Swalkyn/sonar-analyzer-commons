@@ -38,6 +38,11 @@ public class MiscEscapeSequenceTree extends RegexTree implements CharacterClassE
   }
 
   @Override
+  public <T> T accept(ReturningRegexVisitor<T> visitor) {
+    return visitor.visitMiscEscapeSequence(this);
+  }
+
+  @Override
   public RegexTree.Kind kind() {
     return RegexTree.Kind.MISC_ESCAPE_SEQUENCE;
   }

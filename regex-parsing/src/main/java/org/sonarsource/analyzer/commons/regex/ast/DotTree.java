@@ -34,6 +34,11 @@ public class DotTree extends RegexTree {
   }
 
   @Override
+  public <T> T accept(ReturningRegexVisitor<T> visitor) {
+    return visitor.visitDot(this);
+  }
+
+  @Override
   public Kind kind() {
     return RegexTree.Kind.DOT;
   }
