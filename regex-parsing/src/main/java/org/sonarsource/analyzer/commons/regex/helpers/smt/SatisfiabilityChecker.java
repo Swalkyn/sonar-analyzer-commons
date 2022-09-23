@@ -17,17 +17,16 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
-package org.sonarsource.analyzer.commons.regex.helpers;
+package org.sonarsource.analyzer.commons.regex.helpers.smt;
 
-import java.util.List;
-import java.util.ListIterator;
 import java.util.Optional;
-import java.util.stream.Collectors;
+import java.util.function.Function;
 import org.sonarsource.analyzer.commons.regex.RegexParseResult;
 import org.sonarsource.analyzer.commons.regex.ast.AtomicGroupTree;
 import org.sonarsource.analyzer.commons.regex.ast.BackReferenceTree;
 import org.sonarsource.analyzer.commons.regex.ast.BoundaryTree;
 import org.sonarsource.analyzer.commons.regex.ast.CapturingGroupTree;
+import org.sonarsource.analyzer.commons.regex.ast.CharacterClassIntersectionTree;
 import org.sonarsource.analyzer.commons.regex.ast.CharacterClassTree;
 import org.sonarsource.analyzer.commons.regex.ast.CharacterClassUnionTree;
 import org.sonarsource.analyzer.commons.regex.ast.CharacterRangeTree;
@@ -35,15 +34,17 @@ import org.sonarsource.analyzer.commons.regex.ast.CharacterTree;
 import org.sonarsource.analyzer.commons.regex.ast.ConditionalSubpatternTree;
 import org.sonarsource.analyzer.commons.regex.ast.DisjunctionTree;
 import org.sonarsource.analyzer.commons.regex.ast.DotTree;
+import org.sonarsource.analyzer.commons.regex.ast.EscapedCharacterClassTree;
+import org.sonarsource.analyzer.commons.regex.ast.GroupTree;
 import org.sonarsource.analyzer.commons.regex.ast.LookAroundTree;
+import org.sonarsource.analyzer.commons.regex.ast.MiscEscapeSequenceTree;
 import org.sonarsource.analyzer.commons.regex.ast.NonCapturingGroupTree;
 import org.sonarsource.analyzer.commons.regex.ast.Quantifier;
-import org.sonarsource.analyzer.commons.regex.ast.RegexTree;
 import org.sonarsource.analyzer.commons.regex.ast.RepetitionTree;
+import org.sonarsource.analyzer.commons.regex.ast.ReturningRegexVisitor;
 import org.sonarsource.analyzer.commons.regex.ast.SequenceTree;
 import org.sosy_lab.java_smt.api.BooleanFormula;
 import org.sosy_lab.java_smt.api.BooleanFormulaManager;
-import org.sosy_lab.java_smt.api.Formula;
 import org.sosy_lab.java_smt.api.ProverEnvironment;
 import org.sosy_lab.java_smt.api.RegexFormula;
 import org.sosy_lab.java_smt.api.SolverContext;
@@ -51,84 +52,24 @@ import org.sosy_lab.java_smt.api.SolverException;
 import org.sosy_lab.java_smt.api.StringFormula;
 import org.sosy_lab.java_smt.api.StringFormulaManager;
 
-public class SatisfiabilityChecker extends BranchTrackingVisitor {
-  private interface Constraint {
-    boolean isStringConstraint();
-    default boolean isRegexConstraint() {
-      return !isStringConstraint();
-    }
-    StringConstraint asStringConstraint();
-  }
-
-  private class StringConstraint implements Constraint {
-    private final StringFormula stringVar;
-    private final BooleanFormula constraint;
-
-    public StringConstraint(StringFormula stringVar, BooleanFormula constraint) {
-      this.stringVar = stringVar;
-      this.constraint = constraint;
-    }
-
-    @Override
-    public boolean isStringConstraint() {
-      return true;
-    }
-
-    @Override
-    public StringConstraint asStringConstraint() {
-      return this;
-    }
-  }
-
-  private class RegexConstraint implements Constraint {
-    private final RegexFormula constraint;
-
-    public RegexConstraint(RegexFormula constraint) {
-      this.constraint = constraint;
-    }
-
-    public RegexFormula getConstraint() {
-      return constraint;
-    }
-
-    @Override
-    public boolean isStringConstraint() {
-      return false;
-    }
-
-    @Override
-    public StringConstraint asStringConstraint() {
-      StringFormula var = newStringVar();
-      return new StringConstraint(var, smgr.in(var, constraint));
-    }
-  }
-
-  private class ConstraintUnion {
-    public Constraint of(List<RegexConstraint> regexConstraints) {
-      return new RegexConstraint(regexConstraints.stream().map(RegexConstraint::getConstraint).reduce(smgr.makeRegex(""), smgr::union));
-    }
-  }
+public class SatisfiabilityChecker implements ReturningRegexVisitor<Constraint> {
 
   private final SolverContext context;
   private final StringFormulaManager smgr;
   private final BooleanFormulaManager bmgr;
-  private Constraint returnFormula;
-  private Optional<String> returnCharacter = Optional.empty();
+  private final ConstraintConcatenation constraintConcatenation;
+  private final ConstraintDisjunction constraintDisjunction;
+  private final VarNameGenerator varNameGenerator;
   private StringFormula suffix;
   private StringFormula current;
 
-  private StringFormula newStringVar() {
-    return smgr.makeVariable(VarNameGenerator.getFreshName());
+  public StringFormula newStringVar() {
+    return smgr.makeVariable(varNameGenerator.getFreshName());
   }
 
-  private void returnFormula(Formula formula) {
-    returnFormula = formula;
-    returnCharacter = Optional.empty();
-  }
-
-  private void returnCharacter(String character) {
-    returnFormula = smgr.makeRegex(character);
-    returnCharacter = Optional.of(character);
+  public StringConstraint convert(RegexFormula regexFormula) {
+    StringFormula variable = newStringVar();
+    return new StringConstraint(variable, smgr.in(variable, regexFormula));
   }
 
   private String getSolverChar(CharacterTree tree) {
@@ -139,7 +80,7 @@ public class SatisfiabilityChecker extends BranchTrackingVisitor {
   private BooleanFormula split(RegexFormula currentConstraint, RegexFormula suffixConstraint) {
     BooleanFormula lookAroundConstraints = bmgr.and(smgr.in(current, currentConstraint), smgr.in(suffix, suffixConstraint));
     suffix = smgr.concat(current, suffix);
-    current = smgr.makeString(VarNameGenerator.getFreshName());
+    current = newStringVar();
     return lookAroundConstraints;
   }
 
@@ -147,16 +88,19 @@ public class SatisfiabilityChecker extends BranchTrackingVisitor {
     context = solverContext;
     smgr = solverContext.getFormulaManager().getStringFormulaManager();
     bmgr = solverContext.getFormulaManager().getBooleanFormulaManager();
+    constraintConcatenation = new ConstraintConcatenation(smgr, bmgr, this);
+    constraintDisjunction = new ConstraintDisjunction(smgr, bmgr, this);
+    varNameGenerator = new VarNameGenerator();
   }
 
   public boolean check(RegexParseResult parseResult, boolean defaultAnswer) {
     if (parseResult.getResult() == null) {
       return defaultAnswer;
     }
-    super.visit(parseResult.getResult());
-    StringFormula s = smgr.makeVariable("S");
+    StringConstraint constraint = visit(parseResult.getResult()).process(rc -> convert(rc.formula), Function.identity());
     try (ProverEnvironment prover = context.newProverEnvironment()) {
-      prover.addConstraint(smgr.in(s, returnFormula));
+      prover.addConstraint(constraint.formula);
+      System.out.println(context.getFormulaManager().dumpFormula(constraint.formula));
       return !prover.isUnsat();
     } catch (SolverException | InterruptedException e) {
       return true;
@@ -164,154 +108,151 @@ public class SatisfiabilityChecker extends BranchTrackingVisitor {
   }
 
   @Override
-  public void visitBackReference(BackReferenceTree tree) {
+  public Constraint visit(RegexParseResult regexParseResult) {
+    return null;
+  }
+
+  @Override
+  public Constraint visitBackReference(BackReferenceTree tree) {
     throw new UnsupportedOperationException("Backreferences are not supported");
   }
 
   @Override
-  public void visitCharacter(CharacterTree tree) {
-    returnCharacter(getSolverChar(tree));
+  public RegexConstraint visitCharacter(CharacterTree tree) {
+    return new RegexConstraint(smgr.makeRegex(getSolverChar(tree)), getSolverChar(tree));
   }
 
   @Override
-  public void visitSequence(SequenceTree tree) {
-    StringBuilder sb = new StringBuilder();
-    parentFormula = smgr.makeRegex("");
-
-    ListIterator<RegexTree> iterator = tree.getItems().listIterator(tree.getItems().size());
-    // Traversing sequences backwards is needed to create suffix strings for lookaheads
-    while (iterator.hasPrevious()) {
-      super.visit(iterator.previous());
-      if (returnCharacter.isPresent()) {
-        // Combine groups of characters
-        while (returnCharacter.isPresent()) {
-          sb.append(returnCharacter.get());
-          if (iterator.hasPrevious()) {
-            super.visit(iterator.previous());
-          } else {
-            break;
-          }
-        }
-        if (sb.length() != 0) {
-          parentFormula = smgr.concat(smgr.makeRegex(sb.reverse().toString()), parentFormula);
-          sb.setLength(0);
-        }
-      } else {
-        parentFormula = smgr.concat(returnFormula, parentFormula);
-      }
-    }
-    returnFormula(parentFormula);
+  public Constraint visitSequence(SequenceTree tree) {
+    return constraintConcatenation.of(tree);
   }
 
   @Override
-  public void visitDisjunction(DisjunctionTree tree) {
-    List<Constraint> subFormulas = tree.getAlternatives().stream().map(alternative -> {
-      super.visit(alternative);
-      return returnFormula;
-    }).collect(Collectors.toList());
-    if (subFormulas.stream().allMatch(Constraint::isRegexConstraint)) {
-      RegexFormula union = subFormulas.stream()
-        .map(Constraint::getRegexFormula)
-        .reduce(smgr.makeRegex(""), smgr::union);
-      returnFormula(new Constraint(union));
-    } else {
-
-      subFormulas.stream().map(Constraint::asBooleanFormula).
-    }
+  public Constraint visitDisjunction(DisjunctionTree tree) {
+    return constraintDisjunction.of(tree);
   }
 
   @Override
-  public void visitCapturingGroup(CapturingGroupTree tree) {
-    super.visit(tree.getElement());
-    returnFormula(returnFormula);
+  public Constraint visitGroup(GroupTree tree) {
+    return null;
   }
 
   @Override
-  public void visitNonCapturingGroup(NonCapturingGroupTree tree) {
+  public Constraint visitCapturingGroup(CapturingGroupTree tree) {
+    return visit(tree.getElement());
+  }
+
+  @Override
+  public Constraint visitNonCapturingGroup(NonCapturingGroupTree tree) {
     if (tree.getElement() != null) {
-      super.visit(tree.getElement());
-      returnFormula(returnFormula);
+      return visit(tree.getElement());
     }
+    return new RegexConstraint(smgr.none());
   }
 
   @Override
-  public void visitAtomicGroup(AtomicGroupTree tree) {
-    super.visit(tree.getElement());
-    returnFormula(returnFormula);
+  public Constraint visitAtomicGroup(AtomicGroupTree tree) {
+    return visit(tree.getElement());
   }
 
   @Override
-  public void visitLookAround(LookAroundTree tree) {
+  public Constraint visitLookAround(LookAroundTree tree) {
     if (tree.getDirection() == LookAroundTree.Direction.BEHIND) {
-      // Ignore lookbehinds
-      returnFormula(smgr.makeRegex(""));
-    } else {
-      // This does not work for nested lookahead
-      super.visit(tree.getElement());
-      returnFormula(split(parentFormula, returnFormula));
+      Constraint constraint = visit(tree.getElement());
+      StringConstraint stringConstraint = constraint.process(rc -> convert(rc.formula), Function.identity());
+      StringFormula prefixVariable = newStringVar();
+      return new StringConstraint(stringConstraint.stringVar, bmgr.and(stringConstraint.formula, smgr.suffix(stringConstraint.stringVar, prefixVariable)));
     }
-    // Ignore lookarounds for now
+    Constraint constraint = visit(tree.getElement());
+    StringConstraint stringConstraint = constraint.process(rc -> convert(rc.formula), Function.identity());
+    StringFormula suffixVariable = newStringVar();
+    return new StringConstraint(stringConstraint.stringVar, bmgr.and(stringConstraint.formula, smgr.prefix(stringConstraint.stringVar, suffixVariable)));
   }
 
   @Override
-  public void visitBoundary(BoundaryTree tree) {
-    returnFormula(smgr.makeRegex(""));
+  public Constraint visitBoundary(BoundaryTree tree) {
+    return new RegexConstraint(smgr.makeRegex(""));
   }
 
   @Override
-  public void visitRepetition(RepetitionTree tree) {
+  public Constraint visitMiscEscapeSequence(MiscEscapeSequenceTree tree) {
+    return null;
+  }
+
+  @Override
+  public Constraint visitRepetition(RepetitionTree tree) {
     Quantifier quantifier = tree.getQuantifier();
     if (quantifier.getMinimumRepetitions() == 0 && quantifier.getMaximumRepetitions() == null && tree.getElement() instanceof DotTree) {
-      returnFormula(smgr.all());
+      return new RegexConstraint(smgr.all());
     } else {
-      super.visit(tree.getElement());
-      RegexFormula repetition = smgr.cross(returnFormula);
-      if (quantifier.getMinimumRepetitions() > 0) {
-        repetition = smgr.concat(smgr.times(returnFormula, quantifier.getMinimumRepetitions()), repetition);
-      }
-      returnFormula(repetition);
+      Constraint constraint = visit(tree.getElement());
+      return constraint.getRegexConstraint()
+        .orElseThrow(UnsupportedOperationException::new)
+        .map(formula -> {
+          RegexFormula repetition = smgr.cross(formula);
+          if (quantifier.getMinimumRepetitions() > 0) {
+            repetition = smgr.concat(smgr.times(formula, quantifier.getMinimumRepetitions()), repetition);
+          }
+          return repetition;
+      });
     }
   }
 
   @Override
-  public void visitCharacterClass(CharacterClassTree tree) {
-    tree.getContents().accept(this);
+  public RegexConstraint visitCharacterClass(CharacterClassTree tree) {
+    RegexConstraint constraint = tree.getContents().accept(this).getRegexConstraint()
+        .orElseThrow(UnsupportedOperationException::new);
+    return tree.isNegated() ? constraint.map(formula -> smgr.complement(smgr.concat(formula, smgr.all()))) : constraint;
   }
 
   @Override
-  public void visitCharacterRange(CharacterRangeTree tree) {
+  public RegexConstraint visitCharacterRange(CharacterRangeTree tree) {
     RegexFormula characterRange = smgr.range(
       smgr.makeString(getSolverChar(tree.getLowerBound())),
       smgr.makeString(getSolverChar(tree.getUpperBound())));
-    returnFormula(characterRange);
+    return new RegexConstraint(characterRange);
   }
 
   @Override
-  public void visitCharacterClassUnion(CharacterClassUnionTree tree) {
-    RegexFormula union = tree.getCharacterClasses().stream().map(charClass -> {
-      charClass.accept(this);
-      return returnFormula;
-    }).reduce(smgr.makeRegex(""), smgr::union);
-    returnFormula(union);
+  public RegexConstraint visitCharacterClassUnion(CharacterClassUnionTree tree) {
+    RegexFormula unionFormula = tree.getCharacterClasses().stream()
+      .map(charClass -> charClass.accept(this).getRegexConstraint().orElseThrow(UnsupportedOperationException::new).formula)
+      .reduce(smgr.makeRegex(""), smgr::union);
+    return new RegexConstraint(unionFormula);
   }
 
   @Override
-  public void visitDot(DotTree tree) {
-    returnFormula(smgr.allChar());
+  public RegexConstraint visitCharacterClassIntersection(CharacterClassIntersectionTree tree) {
+    return null;
   }
 
   @Override
-  public void visitConditionalSubpattern(ConditionalSubpatternTree tree) {
+  public RegexConstraint visitDot(DotTree tree) {
+    return new RegexConstraint(smgr.allChar());
+  }
+
+  @Override
+  public RegexConstraint visitEscapedCharacterClass(EscapedCharacterClassTree tree) {
+    return null;
+  }
+
+  @Override
+  public Constraint visitConditionalSubpattern(ConditionalSubpatternTree tree) {
     throw new UnsupportedOperationException("Conditionals not supported");
   }
 
-  private static class VarNameGenerator {
-    private static int count = 0;
+  private class VarNameGenerator {
+    private int count = 0;
 
-    private static String getFreshName() {
-      String freshName = String.format("v%d", count);
+    private String getFreshName(String prefix) {
+      String freshName = String.format("%s%d", prefix, count);
       count += 1;
       return freshName;
     }
+
+    private String getFreshName() {
+      return getFreshName("s");
+    }
+
   }
 }
