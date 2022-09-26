@@ -1,6 +1,7 @@
-package org.sonarsource.analyzer.commons.regex.helpers.smt;
+package org.sonarsource.analyzer.commons.regex.smt.constraints;
 
 import java.util.List;
+import org.sonarsource.analyzer.commons.regex.smt.ConstraintVisitor;
 import org.sosy_lab.java_smt.api.BooleanFormula;
 import org.sosy_lab.java_smt.api.StringFormula;
 

@@ -1,9 +1,13 @@
-package org.sonarsource.analyzer.commons.regex.helpers.smt;
+package org.sonarsource.analyzer.commons.regex.smt;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.sonarsource.analyzer.commons.regex.ast.SequenceTree;
+import org.sonarsource.analyzer.commons.regex.smt.constraints.ConcatenationConstraint;
+import org.sonarsource.analyzer.commons.regex.smt.constraints.Constraint;
+import org.sonarsource.analyzer.commons.regex.smt.constraints.RegexConstraint;
+import org.sonarsource.analyzer.commons.regex.smt.constraints.StringConstraint;
 import org.sosy_lab.java_smt.api.BooleanFormula;
 import org.sosy_lab.java_smt.api.BooleanFormulaManager;
 import org.sosy_lab.java_smt.api.RegexFormula;

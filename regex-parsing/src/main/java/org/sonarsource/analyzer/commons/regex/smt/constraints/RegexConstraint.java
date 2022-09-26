@@ -1,4 +1,4 @@
-package org.sonarsource.analyzer.commons.regex.helpers.smt;
+package org.sonarsource.analyzer.commons.regex.smt.constraints;
 
 import java.util.Optional;
 import java.util.function.Consumer;
