@@ -3,7 +3,6 @@ package org.sonarsource.analyzer.commons.regex.helpers.smt;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import org.sosy_lab.java_smt.api.BooleanFormula;
-import org.sosy_lab.java_smt.api.RegexFormula;
 import org.sosy_lab.java_smt.api.StringFormula;
 
 public class StringConstraint implements Constraint{

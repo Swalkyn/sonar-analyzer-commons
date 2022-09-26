@@ -3,7 +3,6 @@ package org.sonarsource.analyzer.commons.regex.helpers.smt;
 import java.util.ArrayList;
 import java.util.List;
 import org.sonarsource.analyzer.commons.regex.ast.DisjunctionTree;
-import org.sonarsource.analyzer.commons.regex.ast.ReturningRegexVisitor;
 import org.sosy_lab.java_smt.api.BooleanFormula;
 import org.sosy_lab.java_smt.api.BooleanFormulaManager;
 import org.sosy_lab.java_smt.api.RegexFormula;

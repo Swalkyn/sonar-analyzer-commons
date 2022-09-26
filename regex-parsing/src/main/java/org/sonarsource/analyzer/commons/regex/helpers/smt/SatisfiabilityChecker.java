@@ -19,7 +19,6 @@
  */
 package org.sonarsource.analyzer.commons.regex.helpers.smt;
 
-import java.util.Optional;
 import java.util.function.Function;
 import org.sonarsource.analyzer.commons.regex.RegexParseResult;
 import org.sonarsource.analyzer.commons.regex.ast.AtomicGroupTree;
@@ -43,7 +42,6 @@ import org.sonarsource.analyzer.commons.regex.ast.Quantifier;
 import org.sonarsource.analyzer.commons.regex.ast.RepetitionTree;
 import org.sonarsource.analyzer.commons.regex.ast.ReturningRegexVisitor;
 import org.sonarsource.analyzer.commons.regex.ast.SequenceTree;
-import org.sosy_lab.java_smt.api.BooleanFormula;
 import org.sosy_lab.java_smt.api.BooleanFormulaManager;
 import org.sosy_lab.java_smt.api.ProverEnvironment;
 import org.sosy_lab.java_smt.api.RegexFormula;
@@ -60,8 +58,6 @@ public class SatisfiabilityChecker implements ReturningRegexVisitor<Constraint> 
   private final ConstraintConcatenation constraintConcatenation;
   private final ConstraintDisjunction constraintDisjunction;
   private final VarNameGenerator varNameGenerator;
-  private StringFormula suffix;
-  private StringFormula current;
 
   public StringFormula newStringVar() {
     return smgr.makeVariable(varNameGenerator.getFreshName());
@@ -75,13 +71,6 @@ public class SatisfiabilityChecker implements ReturningRegexVisitor<Constraint> 
   private String getSolverChar(CharacterTree tree) {
     return (Character.isAlphabetic(tree.codePointOrUnit())) ?
       tree.characterAsString() : String.format("\\u{%d}", tree.codePointOrUnit());
-  }
-
-  private BooleanFormula split(RegexFormula currentConstraint, RegexFormula suffixConstraint) {
-    BooleanFormula lookAroundConstraints = bmgr.and(smgr.in(current, currentConstraint), smgr.in(suffix, suffixConstraint));
-    suffix = smgr.concat(current, suffix);
-    current = newStringVar();
-    return lookAroundConstraints;
   }
 
   public SatisfiabilityChecker(SolverContext solverContext) {
