@@ -5,7 +5,7 @@ import java.util.function.Function;
 import org.sosy_lab.java_smt.api.BooleanFormula;
 import org.sosy_lab.java_smt.api.StringFormula;
 
-public class StringConstraint implements Constraint{
+public abstract class StringConstraint implements Constraint{
   public final StringFormula stringVar;
   public final BooleanFormula formula;
 
@@ -13,6 +13,8 @@ public class StringConstraint implements Constraint{
     this.stringVar = stringVar;
     this.formula = formula;
   }
+
+  public abstract void accept(ConstraintVisitor visitor);
 
   @Override
   public void consume(Consumer<RegexConstraint> rc, Consumer<StringConstraint> sc) {

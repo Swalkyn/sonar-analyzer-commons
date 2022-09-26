@@ -67,7 +67,7 @@ public class ConstraintConcatenation {
       }
       StringFormula concatVar = smgr.concat(stringConstraints.stream().map(sc -> sc.stringVar).collect(Collectors.toList()));
       BooleanFormula concatConstraint = stringConstraints.stream().map(sc -> sc.formula).collect(bmgr.toConjunction());
-      return new StringConstraint(concatVar, concatConstraint);
+      return new ConcatenationConstraint(concatVar, concatConstraint, stringConstraints);
     } else {
       return new RegexConstraint(concatFormula);
     }

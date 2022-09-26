@@ -65,7 +65,7 @@ public class SatisfiabilityChecker implements ReturningRegexVisitor<Constraint> 
 
   public StringConstraint convert(RegexFormula regexFormula) {
     StringFormula variable = newStringVar();
-    return new StringConstraint(variable, smgr.in(variable, regexFormula));
+    return new SimpleStringConstraint(variable, smgr.in(variable, regexFormula));
   }
 
   private String getSolverChar(CharacterTree tree) {
@@ -150,12 +150,12 @@ public class SatisfiabilityChecker implements ReturningRegexVisitor<Constraint> 
       Constraint constraint = visit(tree.getElement());
       StringConstraint stringConstraint = constraint.process(rc -> convert(rc.formula), Function.identity());
       StringFormula prefixVariable = newStringVar();
-      return new StringConstraint(stringConstraint.stringVar, bmgr.and(stringConstraint.formula, smgr.suffix(stringConstraint.stringVar, prefixVariable)));
+      return new LookaroundConstraint(stringConstraint.stringVar, bmgr.and(stringConstraint.formula, smgr.suffix(stringConstraint.stringVar, prefixVariable)), stringConstraint);
     }
     Constraint constraint = visit(tree.getElement());
     StringConstraint stringConstraint = constraint.process(rc -> convert(rc.formula), Function.identity());
     StringFormula suffixVariable = newStringVar();
-    return new StringConstraint(stringConstraint.stringVar, bmgr.and(stringConstraint.formula, smgr.prefix(stringConstraint.stringVar, suffixVariable)));
+    return new LookaroundConstraint(stringConstraint.stringVar, bmgr.and(stringConstraint.formula, smgr.prefix(stringConstraint.stringVar, suffixVariable)), stringConstraint);
   }
 
   @Override

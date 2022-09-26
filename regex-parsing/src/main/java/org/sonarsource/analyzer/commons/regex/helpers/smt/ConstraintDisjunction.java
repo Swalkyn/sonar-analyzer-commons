@@ -39,7 +39,7 @@ public class ConstraintDisjunction {
       }
       StringFormula unionVar = checker.newStringVar();
       BooleanFormula unionConstraint = stringConstraints.stream().map(sc -> bmgr.and(smgr.equal(unionVar, sc.stringVar), sc.formula)).collect(bmgr.toDisjunction());
-      return new StringConstraint(unionVar, unionConstraint);
+      return new DisjunctionConstraint(unionVar, unionConstraint, stringConstraints);
     } else {
       return new RegexConstraint(regexUnion);
     }
