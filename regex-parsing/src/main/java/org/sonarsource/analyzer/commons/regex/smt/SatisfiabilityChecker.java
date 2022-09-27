@@ -60,8 +60,6 @@ public class SatisfiabilityChecker implements ReturningRegexVisitor<Constraint> 
   private final SolverContext context;
   private final StringFormulaManager smgr;
   private final BooleanFormulaManager bmgr;
-  private final ConstraintConcatenation constraintConcatenation;
-  private final ConstraintDisjunction constraintDisjunction;
   private final VarNameGenerator varNameGenerator;
 
   public StringFormula newStringVar() {
@@ -82,8 +80,6 @@ public class SatisfiabilityChecker implements ReturningRegexVisitor<Constraint> 
     context = solverContext;
     smgr = solverContext.getFormulaManager().getStringFormulaManager();
     bmgr = solverContext.getFormulaManager().getBooleanFormulaManager();
-    constraintConcatenation = new ConstraintConcatenation(smgr, bmgr, this);
-    constraintDisjunction = new ConstraintDisjunction(smgr, bmgr, this);
     varNameGenerator = new VarNameGenerator();
   }
 
@@ -118,12 +114,12 @@ public class SatisfiabilityChecker implements ReturningRegexVisitor<Constraint> 
 
   @Override
   public Constraint visitSequence(SequenceTree tree) {
-    return constraintConcatenation.of(tree);
+    return new ConstraintConcatenation(smgr, bmgr, this).of(tree);
   }
 
   @Override
   public Constraint visitDisjunction(DisjunctionTree tree) {
-    return constraintDisjunction.of(tree);
+    return new ConstraintDisjunction(smgr, bmgr, this).of(tree);
   }
 
   @Override

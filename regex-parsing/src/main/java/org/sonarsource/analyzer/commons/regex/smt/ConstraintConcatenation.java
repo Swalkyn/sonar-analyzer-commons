@@ -50,15 +50,12 @@ public class ConstraintConcatenation {
     concatFormula = combineCurrentChars(sb, concatFormula);
     if (concatFormula != null) {
       stringConstraints.add(checker.convert(concatFormula));
+      concatFormula = null;
     }
     stringConstraints.add(constraint);
   }
 
   public Constraint of(SequenceTree tree) {
-    sb = new StringBuilder();
-    concatFormula = null;
-    stringConstraints = new ArrayList<>();
-
     tree.getItems().forEach(item -> {
       Constraint constraint = checker.visit(item);
       constraint.consume(this::concatenateRegexConstraint, this::concatenateStringConstraint);
