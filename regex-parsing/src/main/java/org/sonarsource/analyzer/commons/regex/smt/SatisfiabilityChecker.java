@@ -207,7 +207,7 @@ public class SatisfiabilityChecker implements ReturningRegexVisitor<Constraint> 
   public RegexConstraint visitCharacterClassUnion(CharacterClassUnionTree tree) {
     RegexFormula unionFormula = tree.getCharacterClasses().stream()
       .map(charClass -> charClass.accept(this).getRegexConstraint().orElseThrow(UnsupportedOperationException::new).formula)
-      .reduce(smgr.makeRegex(""), smgr::union);
+      .reduce(smgr.none(), smgr::union);
     return new RegexConstraint(unionFormula);
   }
 
