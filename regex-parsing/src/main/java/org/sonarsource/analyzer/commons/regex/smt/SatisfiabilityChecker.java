@@ -73,7 +73,7 @@ public class SatisfiabilityChecker implements ReturningRegexVisitor<Constraint> 
 
   private String getSolverChar(CharacterTree tree) {
     return (Character.isAlphabetic(tree.codePointOrUnit())) ?
-      tree.characterAsString() : String.format("\\u{%d}", tree.codePointOrUnit());
+      tree.characterAsString() : String.format("\\u{%x}", tree.codePointOrUnit());
   }
 
   public SatisfiabilityChecker(SolverContext solverContext) {
