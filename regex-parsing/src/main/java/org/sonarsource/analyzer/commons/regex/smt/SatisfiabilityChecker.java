@@ -47,6 +47,7 @@ import org.sonarsource.analyzer.commons.regex.smt.constraints.LookaroundConstrai
 import org.sonarsource.analyzer.commons.regex.smt.constraints.RegexConstraint;
 import org.sonarsource.analyzer.commons.regex.smt.constraints.SimpleStringConstraint;
 import org.sonarsource.analyzer.commons.regex.smt.constraints.StringConstraint;
+import org.sosy_lab.java_smt.api.BooleanFormula;
 import org.sosy_lab.java_smt.api.BooleanFormulaManager;
 import org.sosy_lab.java_smt.api.ProverEnvironment;
 import org.sosy_lab.java_smt.api.RegexFormula;
@@ -87,10 +88,15 @@ public class SatisfiabilityChecker implements ReturningRegexVisitor<Constraint> 
     if (parseResult.getResult() == null) {
       return defaultAnswer;
     }
-    StringConstraint constraint = visit(parseResult.getResult()).process(rc -> convert(rc.formula), Function.identity());
+    StringConstraint mainConstraints = visit(parseResult.getResult()).process(rc -> convert(rc.formula), Function.identity());
+    LookaheadConstraintVisitor laVisitor = new LookaheadConstraintVisitor(smgr, bmgr, this);
+    LookbehindConstraintVisitor lbVisitor = new LookbehindConstraintVisitor(smgr, bmgr, this);
+    BooleanFormula lookaheadFormulas = laVisitor.getLookaheadConstraints(mainConstraints);
+    BooleanFormula lookbehindFormulas = lbVisitor.getLookbehindConstraints(mainConstraints);
+    BooleanFormula fullFormula = bmgr.and(mainConstraints.formula, lookaheadFormulas, lookbehindFormulas);
     try (ProverEnvironment prover = context.newProverEnvironment()) {
-      prover.addConstraint(constraint.formula);
-      System.out.println(context.getFormulaManager().dumpFormula(constraint.formula));
+      prover.addConstraint(fullFormula);
+      System.out.println(context.getFormulaManager().dumpFormula(fullFormula));
       return !prover.isUnsat();
     } catch (SolverException | InterruptedException e) {
       return true;
@@ -147,16 +153,10 @@ public class SatisfiabilityChecker implements ReturningRegexVisitor<Constraint> 
 
   @Override
   public Constraint visitLookAround(LookAroundTree tree) {
-    if (tree.getDirection() == LookAroundTree.Direction.BEHIND) {
-      Constraint constraint = visit(tree.getElement());
-      StringConstraint stringConstraint = constraint.process(rc -> convert(rc.formula), Function.identity());
-      StringFormula prefixVariable = newStringVar();
-      return new LookaroundConstraint(stringConstraint.stringVar, bmgr.and(stringConstraint.formula, smgr.suffix(stringConstraint.stringVar, prefixVariable)), stringConstraint);
-    }
     Constraint constraint = visit(tree.getElement());
-    StringConstraint stringConstraint = constraint.process(rc -> convert(rc.formula), Function.identity());
-    StringFormula suffixVariable = newStringVar();
-    return new LookaroundConstraint(stringConstraint.stringVar, bmgr.and(stringConstraint.formula, smgr.prefix(stringConstraint.stringVar, suffixVariable)), stringConstraint);
+    StringFormula dummyVariable = newStringVar();
+    RegexConstraint regexConstraint = constraint.getRegexConstraint().orElseThrow(UnsupportedOperationException::new);
+    return new LookaroundConstraint(dummyVariable, smgr.in(dummyVariable, smgr.makeRegex("")), regexConstraint, tree);
   }
 
   @Override
