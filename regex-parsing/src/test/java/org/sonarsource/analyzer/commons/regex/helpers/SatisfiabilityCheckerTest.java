@@ -92,6 +92,7 @@ class SatisfiabilityCheckerTest {
     assertSatisfiable("(?=a)bc").isFalse();
     assertSatisfiable("(?=a)(?=b).").isFalse();
     assertSatisfiable("(?=abcd)ab(?=.e)..").isFalse();
+    assertSatisfiable("(?=ab).(?:a(?=c)|b(?=d))c").isFalse();
     assertSatisfiable("(?=[ab])(?=[bc])[ac]").isFalse();
     assertSatisfiable("(?=a)[^ba]").isFalse();
   }
@@ -107,6 +108,7 @@ class SatisfiabilityCheckerTest {
   @Test
   void testNegativeLookaheadUnsat() {
     assertSatisfiable("(?!a)a").isFalse();
+    assertSatisfiable("(?!a)ab").isFalse();
     assertSatisfiable("(?!a|b)a").isFalse();
     assertSatisfiable("(?!ab)ab").isFalse();
     assertSatisfiable("(?!.).").isFalse();

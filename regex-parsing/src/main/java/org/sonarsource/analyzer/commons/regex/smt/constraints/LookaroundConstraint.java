@@ -6,17 +6,13 @@ import org.sosy_lab.java_smt.api.BooleanFormula;
 import org.sosy_lab.java_smt.api.StringFormula;
 
 public class LookaroundConstraint extends StringConstraint {
-  public final RegexConstraint element;
+  public final StringFormula continuationVariable;
   public final LookAroundTree tree;
 
-  public LookaroundConstraint(StringFormula stringVar, BooleanFormula formula, RegexConstraint element, LookAroundTree tree) {
+  public LookaroundConstraint(StringFormula stringVar, BooleanFormula formula, StringFormula continuationVariable, LookAroundTree tree) {
     super(stringVar, formula);
-    this.element = element;
+    this.continuationVariable = continuationVariable;
     this.tree = tree;
-  }
-
-  public RegexConstraint getElement() {
-    return element;
   }
 
   @Override

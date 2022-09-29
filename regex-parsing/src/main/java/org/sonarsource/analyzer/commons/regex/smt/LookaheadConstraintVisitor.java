@@ -49,13 +49,7 @@ public class LookaheadConstraintVisitor extends BaseConstraintVisitor {
       while (visited.hasNext()) {
         concatenation = smgr.concat(visited.next(), concatenation);
       }
-      StringFormula variable = checker.newStringVar();
-      BooleanFormula prefixFormula = smgr.prefix(variable, concatenation);
-      BooleanFormula elementFormula = constraint.tree.getPolarity() == LookAroundTree.Polarity.POSITIVE ?
-        smgr.in(variable, constraint.getElement().formula) :
-        bmgr.not(smgr.in(concatenation, smgr.concat(constraint.getElement().formula, smgr.all())));
-      BooleanFormula formula = bmgr.and(elementFormula, prefixFormula);
-      lookaheadConstraints.add(formula);
+      lookaheadConstraints.add(smgr.equal(concatenation, constraint.continuationVariable));
     }
   }
 }
