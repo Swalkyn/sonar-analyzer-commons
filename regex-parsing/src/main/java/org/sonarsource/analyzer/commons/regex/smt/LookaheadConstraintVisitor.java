@@ -44,7 +44,7 @@ public class LookaheadConstraintVisitor extends BaseConstraintVisitor {
   @Override
   public void visitLookaround(LookaroundConstraint constraint) {
     Iterator<StringFormula> visited = getVisited();
-    if (constraint.tree.getDirection() == LookAroundTree.Direction.AHEAD && visited.hasNext()) {
+    if (constraint.direction == LookAroundTree.Direction.AHEAD && visited.hasNext()) {
       StringFormula concatenation = visited.next();
       while (visited.hasNext()) {
         concatenation = smgr.concat(visited.next(), concatenation);

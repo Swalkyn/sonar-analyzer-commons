@@ -19,7 +19,10 @@
  */
 package org.sonarsource.analyzer.commons.regex.smt;
 
+import java.util.Collections;
+import java.util.Optional;
 import java.util.function.Function;
+import java.util.stream.Stream;
 import org.sonarsource.analyzer.commons.regex.RegexParseResult;
 import org.sonarsource.analyzer.commons.regex.ast.AtomicGroupTree;
 import org.sonarsource.analyzer.commons.regex.ast.BackReferenceTree;
@@ -174,7 +177,7 @@ public class SatisfiabilityChecker implements ReturningRegexVisitor<Constraint> 
           bmgr.not(smgr.in(continuationVariable, smgr.concat(smgr.all(), regexConstraint.formula)))
       );
     }
-    return new LookaroundConstraint(dummyVariable, bmgr.and(smgr.in(dummyVariable, smgr.makeRegex("")), formula), continuationVariable, tree);
+    return new LookaroundConstraint(dummyVariable, bmgr.and(smgr.in(dummyVariable, smgr.makeRegex("")), formula), continuationVariable, tree.getDirection());
   }
 
   @Override
@@ -194,15 +197,33 @@ public class SatisfiabilityChecker implements ReturningRegexVisitor<Constraint> 
       return new RegexConstraint(smgr.all());
     } else {
       Constraint constraint = visit(tree.getElement());
-      return constraint.getRegexConstraint()
-        .orElseThrow(UnsupportedOperationException::new)
-        .map(formula -> {
-          RegexFormula repetition = smgr.cross(formula);
-          if (quantifier.getMinimumRepetitions() > 0) {
-            repetition = smgr.concat(smgr.times(formula, quantifier.getMinimumRepetitions()), repetition);
-          }
-          return repetition;
+      RegexFormula elementFormula = constraint.getRegexConstraint()
+        .orElseThrow(UnsupportedOperationException::new).formula;
+      int min = quantifier.getMinimumRepetitions();
+      Optional<Integer> optMax = Optional.ofNullable(quantifier.getMaximumRepetitions());
+      RegexFormula repetitionFormula =  optMax.map(max -> (min == 0 && max == 1) ?
+          smgr.optional(elementFormula) :
+          smgr.concat(smgr.times(elementFormula, min), smgr.concatRegex(Collections.nCopies(max - min, smgr.optional(elementFormula))))
+      ).orElseGet(() -> {
+        if (min == 0) {
+          return smgr.closure(elementFormula);
+        } else if (min == 1) {
+          return smgr.cross(elementFormula);
+        } else {
+          return smgr.concat(smgr.times(elementFormula, min), smgr.closure(elementFormula));
+        }
       });
+      if (quantifier.getModifier() == Quantifier.Modifier.POSSESSIVE) {
+        StringFormula repetitionVariable = newStringVar();
+        StringFormula lookaroundVariable = newStringVar();
+        StringFormula continuationVariable = newStringVar();
+        BooleanFormula formula = bmgr.and(
+          smgr.prefix(lookaroundVariable, continuationVariable),
+          bmgr.not(smgr.in(continuationVariable, smgr.concat(elementFormula, smgr.all())))
+        );
+        return new LookaroundConstraint(repetitionVariable, bmgr.and(smgr.in(repetitionVariable, repetitionFormula), formula), continuationVariable, LookAroundTree.Direction.AHEAD);
+      }
+      return new RegexConstraint(repetitionFormula);
     }
   }
 

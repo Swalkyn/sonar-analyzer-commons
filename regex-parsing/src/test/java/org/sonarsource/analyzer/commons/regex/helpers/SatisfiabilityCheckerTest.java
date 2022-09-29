@@ -19,12 +19,13 @@
  */
 package org.sonarsource.analyzer.commons.regex.helpers;
 
+import java.util.Set;
 import org.assertj.core.api.AbstractBooleanAssert;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.sonarsource.analyzer.commons.regex.RegexFeature;
 import org.sonarsource.analyzer.commons.regex.RegexParseResult;
-import org.sonarsource.analyzer.commons.regex.ast.FlagSet;
 import org.sonarsource.analyzer.commons.regex.smt.SatisfiabilityChecker;
 import org.sosy_lab.common.configuration.InvalidConfigurationException;
 import org.sosy_lab.java_smt.SolverContextFactory;
@@ -46,14 +47,14 @@ class SatisfiabilityCheckerTest {
     context.close();
   }
 
-  private static AbstractBooleanAssert<?> assertSatisfiable(String regex, FlagSet flagSet) {
+  private static AbstractBooleanAssert<?> assertSatisfiable(String regex, int flags) {
     SatisfiabilityChecker satisfiabilityChecker = new SatisfiabilityChecker(context);
-    RegexParseResult result = parseRegex(regex);
+    RegexParseResult result = parseRegex(regex, flags, RegexFeature.POSSESSIVE_QUANTIFIER);
     return assertThat(satisfiabilityChecker.check(result, true));
   }
 
   private static AbstractBooleanAssert<?> assertSatisfiable(String regex) {
-    return assertSatisfiable(regex, new FlagSet());
+    return assertSatisfiable(regex, 0);
   }
 
   @Test
@@ -169,6 +170,34 @@ class SatisfiabilityCheckerTest {
   }
 
   @Test
-  void testCombined() {
+  void testPossessiveQuantifierSat() {
+    assertSatisfiable("x*(?!x)y").isTrue();
+    assertSatisfiable("x*+y").isTrue();
+    assertSatisfiable("x++y").isTrue();
+    assertSatisfiable("(xy)++z").isTrue();
+    assertSatisfiable("(xy)++x").isTrue();
+    assertSatisfiable("([a-y])++z").isTrue();
+    assertSatisfiable("([0-8])++[1-9]").isTrue();
   }
+
+  @Test
+  void testPossessiveQuantifierUnsat() {
+    assertSatisfiable("x++x").isFalse();
+    assertSatisfiable("(xy)++xyz").isFalse();
+    assertSatisfiable("[a-z]++z").isFalse();
+    assertSatisfiable("[0-9]++[13579]").isFalse();
+    assertSatisfiable(".++.").isFalse();
+  }
+
+  @Test
+  void testCombinedSat() {
+    assertSatisfiable("x++(?<=x)").isTrue();
+    assertSatisfiable("x++..(?<=x)").isTrue();
+  }
+
+  @Test
+  void testCombinedUnsat() {
+    assertSatisfiable("x++.(?<=x)").isFalse();
+  }
+
 }

@@ -7,12 +7,12 @@ import org.sosy_lab.java_smt.api.StringFormula;
 
 public class LookaroundConstraint extends StringConstraint {
   public final StringFormula continuationVariable;
-  public final LookAroundTree tree;
+  public final LookAroundTree.Direction direction;
 
-  public LookaroundConstraint(StringFormula stringVar, BooleanFormula formula, StringFormula continuationVariable, LookAroundTree tree) {
+  public LookaroundConstraint(StringFormula stringVar, BooleanFormula formula, StringFormula continuationVariable, LookAroundTree.Direction direction) {
     super(stringVar, formula);
     this.continuationVariable = continuationVariable;
-    this.tree = tree;
+    this.direction = direction;
   }
 
   @Override
