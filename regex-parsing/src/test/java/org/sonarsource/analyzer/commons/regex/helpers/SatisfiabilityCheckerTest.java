@@ -24,6 +24,7 @@ import org.assertj.core.api.AbstractBooleanAssert;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.sonarsource.analyzer.commons.regex.MatchType;
 import org.sonarsource.analyzer.commons.regex.RegexFeature;
 import org.sonarsource.analyzer.commons.regex.RegexParseResult;
 import org.sonarsource.analyzer.commons.regex.smt.SatisfiabilityChecker;
@@ -47,14 +48,18 @@ class SatisfiabilityCheckerTest {
     context.close();
   }
 
-  private static AbstractBooleanAssert<?> assertSatisfiable(String regex, int flags) {
-    SatisfiabilityChecker satisfiabilityChecker = new SatisfiabilityChecker(context);
+  private static AbstractBooleanAssert<?> assertSatisfiable(String regex, MatchType matchType, int flags) {
+    SatisfiabilityChecker satisfiabilityChecker = new SatisfiabilityChecker(context, matchType);
     RegexParseResult result = parseRegex(regex, flags, RegexFeature.POSSESSIVE_QUANTIFIER);
     return assertThat(satisfiabilityChecker.check(result, true));
   }
 
+  private static AbstractBooleanAssert<?> assertSatisfiable(String regex, MatchType matchType) {
+    return assertSatisfiable(regex, matchType, 0);
+  }
+
   private static AbstractBooleanAssert<?> assertSatisfiable(String regex) {
-    return assertSatisfiable(regex, 0);
+    return assertSatisfiable(regex, MatchType.UNKNOWN, 0);
   }
 
   @Test
@@ -83,7 +88,7 @@ class SatisfiabilityCheckerTest {
     assertSatisfiable("a(?=b)").isTrue();
     assertSatisfiable("(?:-(?:one|[0-9]+([a-z](?=[^a-z]|$)|st|nd|rd|th)?))*").isTrue();
 //    assertSatisfiable("(..(?=ab))*").isTrue();  -> Need support for loop unrolling
-//    assertSatisfiable("(?=abc)ab").isTrue();  -> Need support for full/partial matching
+    assertSatisfiable("(?=abc)ab", MatchType.PARTIAL).isTrue();
   }
 
   @Test
@@ -96,13 +101,15 @@ class SatisfiabilityCheckerTest {
     assertSatisfiable("(?=ab).(?:a(?=c)|b(?=d))c").isFalse();
     assertSatisfiable("(?=[ab])(?=[bc])[ac]").isFalse();
     assertSatisfiable("(?=a)[^ba]").isFalse();
+    assertSatisfiable("(?=abc)ab", MatchType.FULL).isFalse();
   }
 
   @Test
   void testNegativeLookaheadSat() {
     assertSatisfiable("(?!ab)..").isTrue();
-//    assertSatisfiable("a(?!:abc):ab").isTrue();  -> Need support for full/partial matching
-//    assertSatisfiable("(?!abc)ab").isTrue();  -> Need support for full/partial matching
+    assertSatisfiable("(?!ab)..c").isTrue();
+    assertSatisfiable("a(?!:abc):ab", MatchType.PARTIAL).isTrue();
+    assertSatisfiable("(?!abc)ab", MatchType.PARTIAL).isTrue();
 
   }
 
@@ -112,6 +119,7 @@ class SatisfiabilityCheckerTest {
     assertSatisfiable("(?!a)ab").isFalse();
     assertSatisfiable("(?!a|b)a").isFalse();
     assertSatisfiable("(?!ab)ab").isFalse();
+    assertSatisfiable("(?!ab)abcd").isFalse();
     assertSatisfiable("(?!.).").isFalse();
     assertSatisfiable("(?!.)ab").isFalse();
 //    assertSatisfiable("(?:a(?!bc))+bc").isFalse();  -> Need support for loop unrolling
@@ -165,13 +173,14 @@ class SatisfiabilityCheckerTest {
     assertSatisfiable("abc(?<!bc)").isFalse();
     assertSatisfiable("abc(?<!bc)d(?<!cd)e").isFalse();
     assertSatisfiable("abc(?<!b|c)").isFalse();
+    assertSatisfiable("2(?<![^3])").isFalse();
     assertSatisfiable("[12](?<![^23])(?<![^13])").isFalse();
     assertSatisfiable("[0-9](?<![0245-9])(?<![13])").isFalse();
   }
 
   @Test
   void testPossessiveQuantifierSat() {
-    assertSatisfiable("x*(?!x)y").isTrue();
+    assertSatisfiable("x*+y").isTrue();
     assertSatisfiable("x*+y").isTrue();
     assertSatisfiable("x++y").isTrue();
     assertSatisfiable("(xy)++z").isTrue();
@@ -200,4 +209,12 @@ class SatisfiabilityCheckerTest {
     assertSatisfiable("x++.(?<=x)").isFalse();
   }
 
+  @Test
+  void testFullmatchSat() {
+  }
+
+  @Test
+  void testFullmatchUnsat() {
+
+  }
 }
