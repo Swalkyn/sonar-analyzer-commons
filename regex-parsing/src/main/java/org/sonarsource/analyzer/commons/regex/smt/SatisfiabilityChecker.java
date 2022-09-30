@@ -21,8 +21,7 @@ package org.sonarsource.analyzer.commons.regex.smt;
 
 import java.util.Collections;
 import java.util.Optional;
-import java.util.function.Function;
-import java.util.stream.Stream;
+import org.sonarsource.analyzer.commons.regex.MatchType;
 import org.sonarsource.analyzer.commons.regex.RegexParseResult;
 import org.sonarsource.analyzer.commons.regex.ast.AtomicGroupTree;
 import org.sonarsource.analyzer.commons.regex.ast.BackReferenceTree;
@@ -37,6 +36,7 @@ import org.sonarsource.analyzer.commons.regex.ast.ConditionalSubpatternTree;
 import org.sonarsource.analyzer.commons.regex.ast.DisjunctionTree;
 import org.sonarsource.analyzer.commons.regex.ast.DotTree;
 import org.sonarsource.analyzer.commons.regex.ast.EscapedCharacterClassTree;
+import org.sonarsource.analyzer.commons.regex.ast.FlagSet;
 import org.sonarsource.analyzer.commons.regex.ast.GroupTree;
 import org.sonarsource.analyzer.commons.regex.ast.LookAroundTree;
 import org.sonarsource.analyzer.commons.regex.ast.MiscEscapeSequenceTree;
@@ -65,6 +65,8 @@ public class SatisfiabilityChecker implements ReturningRegexVisitor<Constraint> 
   private final StringFormulaManager smgr;
   private final BooleanFormulaManager bmgr;
   private final VarNameGenerator varNameGenerator;
+  private final MatchType matchType;
+  private final FlagSet flags;
 
   public StringFormula newStringVar() {
     return smgr.makeVariable(varNameGenerator.getFreshName());
@@ -80,30 +82,50 @@ public class SatisfiabilityChecker implements ReturningRegexVisitor<Constraint> 
       tree.characterAsString() : String.format("\\u{%x}", tree.codePointOrUnit());
   }
 
-  public SatisfiabilityChecker(SolverContext solverContext) {
-    context = solverContext;
+  public SatisfiabilityChecker(SolverContext solverContext, MatchType matchType, FlagSet flags) {
+    this.context = solverContext;
+    this.matchType = matchType;
+    this.flags = flags;
     smgr = solverContext.getFormulaManager().getStringFormulaManager();
     bmgr = solverContext.getFormulaManager().getBooleanFormulaManager();
     varNameGenerator = new VarNameGenerator();
+  }
+
+  public SatisfiabilityChecker(SolverContext solverContext, MatchType matchType) {
+    this(solverContext, matchType, new FlagSet());
+  }
+
+  public SatisfiabilityChecker(SolverContext solverContext) {
+    this(solverContext, MatchType.UNKNOWN);
   }
 
   public boolean check(RegexParseResult parseResult, boolean defaultAnswer) {
     if (parseResult.getResult() == null) {
       return defaultAnswer;
     }
-    StringConstraint mainConstraints = visit(parseResult.getResult()).process(rc -> convert(rc.formula), Function.identity());
-    LookaheadConstraintVisitor laVisitor = new LookaheadConstraintVisitor(smgr, bmgr, this);
-    LookbehindConstraintVisitor lbVisitor = new LookbehindConstraintVisitor(smgr, bmgr, this);
-    BooleanFormula lookaheadFormulas = laVisitor.getLookaheadConstraints(mainConstraints);
-    BooleanFormula lookbehindFormulas = lbVisitor.getLookbehindConstraints(mainConstraints);
-    BooleanFormula fullFormula = bmgr.and(mainConstraints.formula, lookaheadFormulas, lookbehindFormulas);
-    try (ProverEnvironment prover = context.newProverEnvironment()) {
-      prover.addConstraint(fullFormula);
-      System.out.println(context.getFormulaManager().dumpFormula(fullFormula));
-      return !prover.isUnsat();
-    } catch (SolverException | InterruptedException e) {
-      return true;
-    }
+    Optional<StringConstraint> mainConstraints = visit(parseResult.getResult()).getStringConstraint();
+    return mainConstraints.map(constraint -> {
+      StringConstraint extended = constraint;
+      if (matchType != MatchType.FULL) {
+        extended = new ConstraintConcatenation(smgr, bmgr, this).of(
+          new RegexConstraint(smgr.all()),
+          constraint,
+          new RegexConstraint(smgr.all())
+        ).getStringConstraint().get();
+      }
+      LookaheadConstraintVisitor laVisitor = new LookaheadConstraintVisitor(smgr, bmgr, this);
+      LookbehindConstraintVisitor lbVisitor = new LookbehindConstraintVisitor(smgr, bmgr, this);
+      BooleanFormula lookaheadFormulas = laVisitor.getLookaheadConstraints(extended);
+      BooleanFormula lookbehindFormulas = lbVisitor.getLookbehindConstraints(extended);
+      BooleanFormula fullFormula = bmgr.and(extended.formula, lookaheadFormulas, lookbehindFormulas);
+      try (ProverEnvironment prover = context.newProverEnvironment()) {
+        prover.addConstraint(fullFormula);
+        System.out.println(context.getFormulaManager().dumpFormula(fullFormula));
+        return !prover.isUnsat();
+      } catch (SolverException | InterruptedException e) {
+        return true;
+      }
+    }).orElse(true);
   }
 
   @Override
@@ -231,7 +253,9 @@ public class SatisfiabilityChecker implements ReturningRegexVisitor<Constraint> 
   public RegexConstraint visitCharacterClass(CharacterClassTree tree) {
     RegexConstraint constraint = tree.getContents().accept(this).getRegexConstraint()
         .orElseThrow(UnsupportedOperationException::new);
-    return tree.isNegated() ? constraint.map(formula -> smgr.complement(smgr.concat(formula, smgr.all()))) : constraint;
+    return tree.isNegated() ?
+      constraint.map(formula -> smgr.complement(smgr.concat(smgr.union(smgr.makeRegex(""), formula), smgr.all()))) :
+      constraint;
   }
 
   @Override

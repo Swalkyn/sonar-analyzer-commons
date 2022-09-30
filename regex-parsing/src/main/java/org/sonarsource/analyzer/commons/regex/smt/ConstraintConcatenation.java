@@ -1,8 +1,10 @@
 package org.sonarsource.analyzer.commons.regex.smt;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.sonarsource.analyzer.commons.regex.ast.SequenceTree;
 import org.sonarsource.analyzer.commons.regex.smt.constraints.ConcatenationConstraint;
 import org.sonarsource.analyzer.commons.regex.smt.constraints.Constraint;
@@ -18,9 +20,9 @@ public class ConstraintConcatenation {
   private final StringFormulaManager smgr;
   private final BooleanFormulaManager bmgr;
   private final SatisfiabilityChecker checker;
-  private StringBuilder sb = new StringBuilder();
+  private final List<StringConstraint> stringConstraints = new ArrayList<>();
+  private final StringBuilder sb = new StringBuilder();
   private RegexFormula concatFormula = null;
-  private List<StringConstraint> stringConstraints = new ArrayList<>();
 
   public ConstraintConcatenation(StringFormulaManager smgr, BooleanFormulaManager bmgr, SatisfiabilityChecker checker) {
     this.smgr = smgr;
@@ -56,10 +58,15 @@ public class ConstraintConcatenation {
   }
 
   public Constraint of(SequenceTree tree) {
-    tree.getItems().forEach(item -> {
-      Constraint constraint = checker.visit(item);
-      constraint.consume(this::concatenateRegexConstraint, this::concatenateStringConstraint);
-    });
+    return this.of(tree.getItems().stream().map(checker::visit));
+  }
+
+  public Constraint of(Constraint... constraints) {
+    return this.of(Arrays.stream(constraints));
+  }
+
+  private Constraint of(Stream<Constraint> constraints) {
+    constraints.forEach(constraint -> constraint.consume(this::concatenateRegexConstraint, this::concatenateStringConstraint));
 
     concatFormula = combineCurrentChars(sb, concatFormula);
     if (!stringConstraints.isEmpty()) {

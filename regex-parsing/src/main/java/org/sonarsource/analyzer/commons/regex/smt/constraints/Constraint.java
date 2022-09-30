@@ -11,4 +11,8 @@ public interface Constraint {
   default Optional<RegexConstraint> getRegexConstraint() {
     return this instanceof RegexConstraint ? Optional.of((RegexConstraint) this) : Optional.empty();
   }
+
+  default Optional<StringConstraint> getStringConstraint() {
+    return this instanceof StringConstraint ? Optional.of((StringConstraint) this) : Optional.empty();
+  }
 }
