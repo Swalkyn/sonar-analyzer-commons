@@ -73,6 +73,8 @@ class SatisfiabilityCheckerTest {
     assertSatisfiable("a+").isTrue();
     assertSatisfiable("a++").isTrue();
     assertSatisfiable("abc").isTrue();
+    assertSatisfiable("\\\\d").isTrue();
+    assertSatisfiable("\\\\n").isTrue();
     assertSatisfiable("abc(d|e)").isTrue();
   }
 

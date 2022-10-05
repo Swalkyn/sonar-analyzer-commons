@@ -291,7 +291,38 @@ public class SatisfiabilityChecker implements ReturningRegexVisitor<Constraint> 
 
   @Override
   public RegexConstraint visitEscapedCharacterClass(EscapedCharacterClassTree tree) {
-    return null;
+    RegexFormula regexFormula;
+    switch (tree.getType()) {
+      case 'd':
+      case 'D':
+        regexFormula = smgr.range('0', '9');
+        break;
+      case 'w':
+      case 'W':
+        regexFormula = smgr.complement(smgr.union(smgr.range('a', 'z'),
+          smgr.union(smgr.range('A', 'Z'),
+            smgr.union(smgr.range('0', '9'),
+              smgr.makeRegex("_")))));
+        break;
+      case 's':
+      case 'S':
+        regexFormula = smgr.union(smgr.range('\t', '\r'),
+          smgr.union(smgr.makeRegex(" "),
+            smgr.union(smgr.makeRegex("\\u0085"),
+              smgr.union(smgr.makeRegex("\\u00A0"),
+                smgr.union(smgr.makeRegex("\\u1680"),
+                  smgr.union(smgr.range((char) 0x2000, (char) 0x200A),
+                    smgr.union(smgr.range((char) 0x2028, (char) 0x2029),
+                      smgr.union(smgr.makeRegex("\\u202F"),
+                        smgr.union(smgr.makeRegex("\\u205F"), smgr.makeRegex("\\u3000"))))))))));
+        break;
+      default:
+        throw new UnsupportedOperationException("Unsupported escape sequence");
+    }
+    if (tree.isNegation()) {
+      regexFormula = smgr.complement(regexFormula);
+    }
+    return new RegexConstraint(regexFormula);
   }
 
   @Override
