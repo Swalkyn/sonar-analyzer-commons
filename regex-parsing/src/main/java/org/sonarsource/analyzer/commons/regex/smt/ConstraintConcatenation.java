@@ -96,6 +96,9 @@ public class ConstraintConcatenation {
       BooleanFormula concatConstraint = stringConstraints.stream().map(sc -> sc.formula).collect(bmgr.toConjunction());
       return new ConcatenationConstraint(concatVar, concatConstraint, stringConstraints);
     } else {
+      if (concatFormula == null) {
+        concatFormula = smgr.makeRegex("");
+      }
       return new RegexConstraint(concatFormula);
     }
   }

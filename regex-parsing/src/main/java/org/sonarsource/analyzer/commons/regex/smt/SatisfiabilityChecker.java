@@ -105,29 +105,32 @@ public class SatisfiabilityChecker implements ReturningRegexVisitor<Constraint> 
     if (parseResult.getResult() == null) {
       return defaultAnswer;
     }
-    Optional<StringConstraint> mainConstraints = visit(parseResult.getResult()).getStringConstraint();
-    return mainConstraints.map(constraint -> {
-      StringConstraint extended = constraint;
-      if (matchType != MatchType.FULL) {
-        extended = new ConstraintConcatenation(smgr, bmgr, this).of(
-          new RegexConstraint(smgr.all()),
-          constraint,
-          new RegexConstraint(smgr.all())
-        ).getStringConstraint().get();
-      }
-      LookaheadConstraintVisitor laVisitor = new LookaheadConstraintVisitor(smgr, bmgr, this);
-      LookbehindConstraintVisitor lbVisitor = new LookbehindConstraintVisitor(smgr, bmgr, this);
-      BooleanFormula lookaheadFormulas = laVisitor.getLookaheadConstraints(extended);
-      BooleanFormula lookbehindFormulas = lbVisitor.getLookbehindConstraints(extended);
-      BooleanFormula fullFormula = bmgr.and(extended.formula, lookaheadFormulas, lookbehindFormulas);
-      try (ProverEnvironment prover = context.newProverEnvironment()) {
-        prover.addConstraint(fullFormula);
-        System.out.println(context.getFormulaManager().dumpFormula(fullFormula));
-        return !prover.isUnsat();
-      } catch (SolverException | InterruptedException e) {
-        return true;
-      }
-    }).orElse(true);
+    try {
+      Optional<StringConstraint> mainConstraints = visit(parseResult.getResult()).getStringConstraint();
+      return mainConstraints.map(constraint -> {
+        StringConstraint extended = constraint;
+        if (matchType != MatchType.FULL) {
+          extended = new ConstraintConcatenation(smgr, bmgr, this).of(
+            new RegexConstraint(smgr.all()),
+            constraint,
+            new RegexConstraint(smgr.all())
+          ).getStringConstraint().get();
+        }
+        LookaheadConstraintVisitor laVisitor = new LookaheadConstraintVisitor(smgr, bmgr, this);
+        LookbehindConstraintVisitor lbVisitor = new LookbehindConstraintVisitor(smgr, bmgr, this);
+        BooleanFormula lookaheadFormulas = laVisitor.getLookaheadConstraints(extended);
+        BooleanFormula lookbehindFormulas = lbVisitor.getLookbehindConstraints(extended);
+        BooleanFormula fullFormula = bmgr.and(extended.formula, lookaheadFormulas, lookbehindFormulas);
+        try (ProverEnvironment prover = context.newProverEnvironment()) {
+          prover.addConstraint(fullFormula);
+          return !prover.isUnsat();
+        } catch (SolverException | InterruptedException e) {
+          return true;
+        }
+      }).orElse(true);
+    } catch (UnsupportedOperationException e) {
+      return defaultAnswer;
+    }
   }
 
   @Override
@@ -215,7 +218,7 @@ public class SatisfiabilityChecker implements ReturningRegexVisitor<Constraint> 
 
   @Override
   public Constraint visitMiscEscapeSequence(MiscEscapeSequenceTree tree) {
-    return null;
+    throw new UnsupportedOperationException("Misc. escape trees are not supported");
   }
 
   @Override
@@ -281,7 +284,10 @@ public class SatisfiabilityChecker implements ReturningRegexVisitor<Constraint> 
 
   @Override
   public RegexConstraint visitCharacterClassIntersection(CharacterClassIntersectionTree tree) {
-    return null;
+    RegexFormula intersectionFormula = tree.getCharacterClasses().stream()
+      .map(charClass -> charClass.accept(this).getRegexConstraint().orElseThrow(UnsupportedOperationException::new).formula)
+      .reduce(smgr.all(), smgr::intersection);
+    return new RegexConstraint(intersectionFormula);
   }
 
   @Override
