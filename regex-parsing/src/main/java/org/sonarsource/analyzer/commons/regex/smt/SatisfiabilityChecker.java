@@ -20,9 +20,11 @@
 package org.sonarsource.analyzer.commons.regex.smt;
 
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import org.sonarsource.analyzer.commons.regex.MatchType;
 import org.sonarsource.analyzer.commons.regex.RegexParseResult;
 import org.sonarsource.analyzer.commons.regex.ast.AtomicGroupTree;
@@ -123,7 +125,11 @@ public class SatisfiabilityChecker implements ReturningRegexVisitor<Constraint> 
         BooleanFormula fullFormula = bmgr.and(extended.formula, lookaheadFormulas, lookbehindFormulas);
         try (ProverEnvironment prover = context.newProverEnvironment()) {
           prover.addConstraint(fullFormula);
-          return !prover.isUnsat();
+          ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+          ScheduledFuture<?> future = scheduler.schedule(() -> Z3ShutdownHack.shutdownHack(context, "timeout"), 1000, TimeUnit.MILLISECONDS);
+          boolean sat = !prover.isUnsat();
+          future.cancel(false);
+          return sat;
         } catch (SolverException | InterruptedException e) {
           return true;
         }
