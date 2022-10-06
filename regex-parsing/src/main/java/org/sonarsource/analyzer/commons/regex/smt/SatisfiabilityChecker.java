@@ -173,7 +173,7 @@ public class SatisfiabilityChecker implements ReturningRegexVisitor<Constraint> 
     if (tree.getElement() != null) {
       return visit(tree.getElement());
     }
-    return new RegexConstraint(smgr.none());
+    return new RegexConstraint(smgr.makeRegex(""));
   }
 
   @Override
@@ -232,10 +232,15 @@ public class SatisfiabilityChecker implements ReturningRegexVisitor<Constraint> 
         .orElseThrow(UnsupportedOperationException::new).formula;
       int min = quantifier.getMinimumRepetitions();
       Optional<Integer> optMax = Optional.ofNullable(quantifier.getMaximumRepetitions());
-      RegexFormula repetitionFormula =  optMax.map(max -> (min == 0 && max == 1) ?
-          smgr.optional(elementFormula) :
-          smgr.concat(smgr.times(elementFormula, min), smgr.concatRegex(Collections.nCopies(max - min, smgr.optional(elementFormula))))
-      ).orElseGet(() -> {
+      RegexFormula repetitionFormula =  optMax.map(max -> {
+        if (min == 0 && max == 1) {
+          return smgr.optional(elementFormula);
+        } else if (min == max) {
+          return smgr.times(elementFormula, min);
+        } else {
+          return smgr.concat(smgr.times(elementFormula, min), smgr.concatRegex(Collections.nCopies(max - min, smgr.optional(elementFormula))));
+        }
+      }).orElseGet(() -> {
         if (min == 0) {
           return smgr.closure(elementFormula);
         } else if (min == 1) {
