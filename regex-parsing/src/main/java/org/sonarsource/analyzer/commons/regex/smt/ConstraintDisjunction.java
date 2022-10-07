@@ -56,7 +56,7 @@ public class ConstraintDisjunction {
         stringConstraints::add
       )
     );
-    if (stringConstraints.size() > 1) {
+    if (!stringConstraints.isEmpty()) {
       if (regexUnion != null) {
         stringConstraints.add(checker.convert(regexUnion));
       }
