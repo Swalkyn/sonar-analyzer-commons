@@ -25,6 +25,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import org.sonarsource.analyzer.commons.regex.MatchType;
 import org.sonarsource.analyzer.commons.regex.RegexParseResult;
 import org.sonarsource.analyzer.commons.regex.ast.AtomicGroupTree;
@@ -106,42 +107,49 @@ public class SatisfiabilityChecker implements ReturningRegexVisitor<Constraint> 
   public boolean check(RegexParseResult parseResult, boolean defaultAnswer) {
     if (parseResult.getResult() == null) {
       return defaultAnswer;
+    } else if (new FastSatisfiabilityChecker().canRegexAlwaysMatch(parseResult)) {
+     return true;
     }
     try {
-      Optional<StringConstraint> mainConstraints = visit(parseResult.getResult()).getStringConstraint();
-      return mainConstraints.map(constraint -> {
-        StringConstraint extended = constraint;
-        if (matchType != MatchType.FULL) {
-          extended = new ConstraintConcatenation(smgr, bmgr, this).of(
-            new RegexConstraint(smgr.all()),
-            constraint,
-            new RegexConstraint(smgr.all())
-          ).getStringConstraint().get();
-        }
-        LookaheadConstraintVisitor laVisitor = new LookaheadConstraintVisitor(smgr, bmgr, this);
-        LookbehindConstraintVisitor lbVisitor = new LookbehindConstraintVisitor(smgr, bmgr, this);
-        BooleanFormula lookaheadFormulas = laVisitor.getLookaheadConstraints(extended);
-        BooleanFormula lookbehindFormulas = lbVisitor.getLookbehindConstraints(extended);
-        BooleanFormula fullFormula = bmgr.and(extended.formula, lookaheadFormulas, lookbehindFormulas);
-        try (ProverEnvironment prover = context.newProverEnvironment()) {
-          prover.addConstraint(fullFormula);
-          ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-          ScheduledFuture<?> future = scheduler.schedule(() -> Z3ShutdownHack.shutdownHack(context, "timeout"), 1000, TimeUnit.MILLISECONDS);
-          boolean sat = !prover.isUnsat();
-          future.cancel(false);
-          return sat;
-        } catch (SolverException | InterruptedException e) {
-          return true;
-        }
-      }).orElse(true);
+      StringConstraint mainConstraints = visit(parseResult);
+      StringConstraint extended = mainConstraints;
+      if (matchType != MatchType.FULL) {
+        extended = new ConstraintConcatenation(smgr, bmgr, this).of(
+          new RegexConstraint(smgr.all()),
+          mainConstraints,
+          new RegexConstraint(smgr.all())
+        ).getStringConstraint().get();
+      }
+      LookaheadConstraintVisitor laVisitor = new LookaheadConstraintVisitor(smgr, bmgr, this);
+      LookbehindConstraintVisitor lbVisitor = new LookbehindConstraintVisitor(smgr, bmgr, this);
+      BooleanFormula lookaheadFormulas = laVisitor.getLookaheadConstraints(extended);
+      BooleanFormula lookbehindFormulas = lbVisitor.getLookbehindConstraints(extended);
+      BooleanFormula fullFormula = bmgr.and(extended.formula, lookaheadFormulas, lookbehindFormulas);
+      return solve(fullFormula);
     } catch (UnsupportedOperationException e) {
       return defaultAnswer;
     }
   }
 
+  private boolean solve(BooleanFormula formula) {
+    try (ProverEnvironment prover = context.newProverEnvironment()) {
+      prover.addConstraint(formula);
+      ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+      ScheduledFuture<?> future = scheduler.schedule(() -> {
+        System.out.println("Timeout");
+        Z3ShutdownHack.shutdownHack(context, "timeout");
+      }, 1000, TimeUnit.MILLISECONDS);
+      boolean sat = !prover.isUnsat();
+      future.cancel(false);
+      return sat;
+    } catch (SolverException | InterruptedException e) {
+      return true;
+    }
+  }
+
   @Override
-  public Constraint visit(RegexParseResult regexParseResult) {
-    return null;
+  public StringConstraint visit(RegexParseResult regexParseResult) {
+    return this.visit(regexParseResult.getResult()).process(rc -> convert(rc.formula), Function.identity());
   }
 
   @Override
