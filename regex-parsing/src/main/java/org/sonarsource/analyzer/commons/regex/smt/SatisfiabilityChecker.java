@@ -193,7 +193,7 @@ public class SatisfiabilityChecker implements ReturningRegexVisitor<Constraint> 
     StringFormula dummyVariable = newStringVar();
     StringFormula lookaroundVariable = newStringVar();
     StringFormula continuationVariable = newStringVar();
-    RegexConstraint regexConstraint = constraint.getRegexConstraint().orElseThrow(UnsupportedOperationException::new);
+    RegexConstraint regexConstraint = constraint.getRegexConstraint().orElseThrow(() -> new UnsupportedOperationException("Nested lookarounds are not supported"));
     BooleanFormula formula;
     if (tree.getDirection() == LookAroundTree.Direction.AHEAD && tree.getPolarity() == LookAroundTree.Polarity.POSITIVE) {
       formula = bmgr.and(
@@ -235,7 +235,7 @@ public class SatisfiabilityChecker implements ReturningRegexVisitor<Constraint> 
     } else {
       Constraint constraint = visit(tree.getElement());
       RegexFormula elementFormula = constraint.getRegexConstraint()
-        .orElseThrow(UnsupportedOperationException::new).formula;
+        .orElseThrow(() -> new UnsupportedOperationException("Lookarounds inside repetitions are not supported")).formula;
       int min = quantifier.getMinimumRepetitions();
       Optional<Integer> optMax = Optional.ofNullable(quantifier.getMaximumRepetitions());
       RegexFormula repetitionFormula =  optMax.map(max -> {
@@ -272,7 +272,7 @@ public class SatisfiabilityChecker implements ReturningRegexVisitor<Constraint> 
   @Override
   public RegexConstraint visitCharacterClass(CharacterClassTree tree) {
     RegexConstraint constraint = tree.getContents().accept(this).getRegexConstraint()
-        .orElseThrow(UnsupportedOperationException::new);
+        .orElseThrow(IllegalArgumentException::new);
     return tree.isNegated() ?
       constraint.map(formula -> smgr.difference(smgr.allChar(), formula)) : constraint;
   }
@@ -288,7 +288,7 @@ public class SatisfiabilityChecker implements ReturningRegexVisitor<Constraint> 
   @Override
   public RegexConstraint visitCharacterClassUnion(CharacterClassUnionTree tree) {
     RegexFormula unionFormula = tree.getCharacterClasses().stream()
-      .map(charClass -> charClass.accept(this).getRegexConstraint().orElseThrow(UnsupportedOperationException::new).formula)
+      .map(charClass -> charClass.accept(this).getRegexConstraint().orElseThrow(IllegalArgumentException::new).formula)
       .reduce(smgr.none(), smgr::union);
     return new RegexConstraint(unionFormula);
   }
@@ -296,7 +296,7 @@ public class SatisfiabilityChecker implements ReturningRegexVisitor<Constraint> 
   @Override
   public RegexConstraint visitCharacterClassIntersection(CharacterClassIntersectionTree tree) {
     RegexFormula intersectionFormula = tree.getCharacterClasses().stream()
-      .map(charClass -> charClass.accept(this).getRegexConstraint().orElseThrow(UnsupportedOperationException::new).formula)
+      .map(charClass -> charClass.accept(this).getRegexConstraint().orElseThrow(IllegalArgumentException::new).formula)
       .reduce(smgr.all(), smgr::intersection);
     return new RegexConstraint(intersectionFormula);
   }
