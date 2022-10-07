@@ -65,7 +65,7 @@ import org.sosy_lab.java_smt.api.StringFormulaManager;
 
 public class SatisfiabilityChecker implements ReturningRegexVisitor<Constraint> {
 
-  public final SolverContext context;
+  private final SolverContext context;
   private final StringFormulaManager smgr;
   private final BooleanFormulaManager bmgr;
   private final VarNameGenerator varNameGenerator;
