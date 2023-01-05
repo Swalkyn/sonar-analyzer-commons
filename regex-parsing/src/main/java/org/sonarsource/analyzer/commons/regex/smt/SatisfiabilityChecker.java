@@ -204,21 +204,15 @@ public class SatisfiabilityChecker implements ReturningRegexVisitor<Constraint> 
     RegexConstraint regexConstraint = constraint.getRegexConstraint().orElseThrow(() -> new UnsupportedOperationException("Nested lookarounds are not supported"));
     BooleanFormula formula;
     if (tree.getDirection() == LookAroundTree.Direction.AHEAD && tree.getPolarity() == LookAroundTree.Polarity.POSITIVE) {
-      formula = bmgr.and(
-        smgr.in(lookaroundVariable, regexConstraint.formula),
-        smgr.prefix(lookaroundVariable, continuationVariable));
+      formula = smgr.in(continuationVariable, smgr.concat(regexConstraint.formula, smgr.all()));
     } else if (tree.getDirection() == LookAroundTree.Direction.AHEAD && tree.getPolarity() == LookAroundTree.Polarity.NEGATIVE) {
-      formula = context.getFormulaManager().getQuantifiedFormulaManager().forall(lookaroundVariable,
-        bmgr.implication(smgr.in(lookaroundVariable, regexConstraint.formula), bmgr.not(smgr.prefix(lookaroundVariable, continuationVariable))));
+      formula = smgr.in(continuationVariable, smgr.complement(smgr.concat(regexConstraint.formula, smgr.all())));
     }
     else if (tree.getDirection() == LookAroundTree.Direction.BEHIND && tree.getPolarity() == LookAroundTree.Polarity.POSITIVE) {
-      formula = bmgr.and(
-        smgr.in(lookaroundVariable, regexConstraint.formula),
-        smgr.suffix(lookaroundVariable, continuationVariable));
+      formula = smgr.in(continuationVariable, smgr.concat(smgr.all(), regexConstraint.formula));
     }
     else {
-      formula = context.getFormulaManager().getQuantifiedFormulaManager().forall(lookaroundVariable,
-        bmgr.implication(smgr.in(lookaroundVariable, regexConstraint.formula), bmgr.not(smgr.suffix(lookaroundVariable, continuationVariable))));
+      formula = smgr.in(continuationVariable, smgr.complement(smgr.concat(smgr.all(), regexConstraint.formula)));
     }
     return new LookaroundConstraint(
       dummyVariable, bmgr.and(smgr.in(dummyVariable, smgr.makeRegex("")), formula),
@@ -265,10 +259,8 @@ public class SatisfiabilityChecker implements ReturningRegexVisitor<Constraint> 
       });
       if (quantifier.getModifier() == Quantifier.Modifier.POSSESSIVE) {
         StringFormula repetitionVariable = newStringVar();
-        StringFormula lookaroundVariable = newStringVar();
         StringFormula continuationVariable = newStringVar();
-        BooleanFormula formula = context.getFormulaManager().getQuantifiedFormulaManager().forall(lookaroundVariable,
-          bmgr.implication(smgr.in(lookaroundVariable, elementFormula), bmgr.not(smgr.prefix(lookaroundVariable, continuationVariable))));
+        BooleanFormula formula = smgr.in(continuationVariable, smgr.complement(smgr.concat(elementFormula, smgr.all())));
         return new LookaroundConstraint(
           repetitionVariable, bmgr.and(smgr.in(repetitionVariable, repetitionFormula), formula),
           continuationVariable, LookAroundTree.Direction.AHEAD);
