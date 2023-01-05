@@ -213,10 +213,19 @@ class SatisfiabilityCheckerTest {
 
   @Test
   void testFullmatchSat() {
+    assertSatisfiable("a(?=.+)b", MatchType.FULL).isTrue();
+    assertSatisfiable("(?<=.*)abc", MatchType.FULL).isTrue();
   }
 
   @Test
   void testFullmatchUnsat() {
+    assertSatisfiable("a(?=b)", MatchType.FULL).isFalse();
+    assertSatisfiable("(?<=.).", MatchType.FULL).isFalse();
+  }
 
+  @Test
+  void timeoutUnsat() {
+    assertSatisfiable("(?=.*a)b*", MatchType.FULL).isFalse();
+    assertSatisfiable("x+(?!x).(?<=.x)", MatchType.FULL).isFalse();
   }
 }
